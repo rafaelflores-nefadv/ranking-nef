@@ -38,7 +38,14 @@ class SettingsController extends Controller
             'sound' => 'Som',
         ];
         $seasons = Season::all();
-        $scoreRules = ScoreRule::where('is_active', true)->get();
+        $scoreRules = ScoreRule::orderBy('priority')->orderBy('ocorrencia')->get();
+
+        // Carregar sons personalizados com URLs completas
+        $customSoundsPaths = json_decode($configs['notifications_custom_sounds'] ?? '{}', true) ?: [];
+        $customSounds = [];
+        foreach ($customSoundsPaths as $eventKey => $filePath) {
+            $customSounds[$eventKey] = asset('storage/' . $filePath);
+        }
 
         return view('settings', compact(
             'configs',
@@ -46,7 +53,8 @@ class SettingsController extends Controller
             'scoreRules',
             'notificationEventsConfig',
             'notificationEventsLabels',
-            'notificationChannelsLabels'
+            'notificationChannelsLabels',
+            'customSounds'
         ));
     }
 
@@ -152,6 +160,123 @@ class SettingsController extends Controller
             ->with('status', 'Leitura por voz atualizada com sucesso!');
     }
 
+    public function updateSoundSettings(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Acesso negado');
+        }
+
+        $submitted = $request->input('notifications_sounds', []);
+        $soundsFiles = $request->file('notifications_sounds_file', []);
+        $soundsConfig = [];
+        $customSounds = json_decode(Config::where('key', 'notifications_custom_sounds')->value('value') ?? '{}', true) ?: [];
+
+        // Processar uploads de arquivos
+        foreach ($soundsFiles as $eventKey => $file) {
+            if ($file && $file->isValid()) {
+                // Validar tipo de arquivo
+                $allowedMimes = ['audio/mpeg', 'audio/mp3', 'audio/mpeg3'];
+                $allowedExtensions = ['mp3'];
+                
+                $mimeType = $file->getMimeType();
+                $extension = strtolower($file->getClientOriginalExtension());
+                
+                if (!in_array($mimeType, $allowedMimes) && !in_array($extension, $allowedExtensions)) {
+                    continue;
+                }
+
+                // Criar diretório se não existir
+                $soundDir = storage_path('app/public/sounds');
+                if (!is_dir($soundDir)) {
+                    mkdir($soundDir, 0755, true);
+                }
+
+                // Remover arquivo antigo se existir
+                if (isset($customSounds[$eventKey])) {
+                    $oldFile = storage_path('app/public/' . $customSounds[$eventKey]);
+                    if (file_exists($oldFile)) {
+                        unlink($oldFile);
+                    }
+                }
+
+                // Salvar novo arquivo
+                $filename = $eventKey . '_' . time() . '.' . $extension;
+                $file->move($soundDir, $filename);
+                $customSounds[$eventKey] = 'sounds/' . $filename;
+            }
+        }
+
+        // Processar configurações de sons
+        foreach ($this->defaultNotificationEventsConfig() as $event => $channels) {
+            if (isset($submitted[$event])) {
+                $soundsConfig[$event] = $submitted[$event];
+                
+                // Se não for custom e houver arquivo customizado, remover
+                if ($soundsConfig[$event] !== 'custom' && isset($customSounds[$event])) {
+                    $oldFile = storage_path('app/public/' . $customSounds[$event]);
+                    if (file_exists($oldFile)) {
+                        unlink($oldFile);
+                    }
+                    unset($customSounds[$event]);
+                }
+            }
+        }
+
+        Config::updateOrCreate(
+            ['key' => 'notifications_sounds_config'],
+            ['value' => json_encode($soundsConfig)]
+        );
+
+        Config::updateOrCreate(
+            ['key' => 'notifications_custom_sounds'],
+            ['value' => json_encode($customSounds)]
+        );
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Configurações de sons atualizadas com sucesso!');
+    }
+
+    public function removeCustomSound(Request $request, string $eventKey)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Acesso negado');
+        }
+
+        $customSounds = json_decode(Config::where('key', 'notifications_custom_sounds')->value('value') ?? '{}', true) ?: [];
+
+        if (isset($customSounds[$eventKey])) {
+            $filePath = storage_path('app/public/' . $customSounds[$eventKey]);
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+            unset($customSounds[$eventKey]);
+
+            Config::updateOrCreate(
+                ['key' => 'notifications_custom_sounds'],
+                ['value' => json_encode($customSounds)]
+            );
+
+            // Atualizar configuração de som para padrão se estava usando custom
+            $soundsConfig = json_decode(Config::where('key', 'notifications_sounds_config')->value('value') ?? '{}', true) ?: [];
+            if (isset($soundsConfig[$eventKey]) && $soundsConfig[$eventKey] === 'custom') {
+                $soundsConfig[$eventKey] = 'notification';
+                Config::updateOrCreate(
+                    ['key' => 'notifications_sounds_config'],
+                    ['value' => json_encode($soundsConfig)]
+                );
+            }
+        }
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Som personalizado removido com sucesso!');
+    }
+
     public function testVoice(Request $request)
     {
         $user = $request->user();
@@ -246,6 +371,37 @@ class SettingsController extends Controller
         return implode(' ', $parts);
     }
 
+    public function storeScoreRule(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Acesso negado');
+        }
+
+        $this->authorize('create', ScoreRule::class);
+
+        $validated = $request->validate([
+            'ocorrencia' => 'required|string',
+            'points' => 'required|numeric',
+            'description' => 'nullable|string',
+            'priority' => 'nullable|integer',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        ScoreRule::create([
+            'ocorrencia' => $validated['ocorrencia'],
+            'points' => $validated['points'],
+            'description' => $validated['description'] ?? null,
+            'priority' => $validated['priority'] ?? 0,
+            'is_active' => $request->boolean('is_active', true),
+        ]);
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Regra de pontuação criada com sucesso!');
+    }
+
     public function updateScoreRule(Request $request, ScoreRule $scoreRule)
     {
         $user = $request->user();
@@ -275,6 +431,24 @@ class SettingsController extends Controller
         return redirect()
             ->route('settings')
             ->with('status', 'Regra de pontuação atualizada com sucesso!');
+    }
+
+    public function destroyScoreRule(Request $request, string $scoreRule)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Acesso negado');
+        }
+
+        $scoreRuleModel = ScoreRule::findOrFail($scoreRule);
+        $this->authorize('delete', $scoreRuleModel);
+
+        $scoreRuleModel->delete();
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Regra de pontuação excluída com sucesso!');
     }
 
     public function updateGeneral(Request $request)

@@ -71,8 +71,71 @@ class DashboardController extends Controller
         $user = $request->user();
         $data = $this->buildDashboardData($request->query('team'));
         $configs = Config::all()->pluck('value', 'key');
+        
+        // Normalizar configuração de eventos de notificação
+        $notificationEventsConfig = $this->normalizeNotificationEventsConfig(
+            $configs['notifications_events_config'] ?? null
+        );
 
-        return view('dashboard', array_merge($data, ['configs' => $configs]));
+        return view('dashboard', array_merge($data, [
+            'configs' => $configs,
+            'notificationEventsConfig' => $notificationEventsConfig,
+        ]));
+    }
+
+    private function normalizeNotificationEventsConfig(?string $json): array
+    {
+        $defaults = [
+            'sale_registered' => [
+                'system' => true,
+                'email' => false,
+                'sound' => true,
+            ],
+            'ranking_position_changed' => [
+                'system' => true,
+                'email' => false,
+                'sound' => false,
+            ],
+            'entered_top_3' => [
+                'system' => true,
+                'email' => true,
+                'sound' => true,
+            ],
+            'goal_reached' => [
+                'system' => true,
+                'email' => true,
+                'sound' => true,
+            ],
+            'season_started' => [
+                'system' => true,
+                'email' => true,
+                'sound' => false,
+            ],
+            'season_ended' => [
+                'system' => true,
+                'email' => true,
+                'sound' => false,
+            ],
+        ];
+        
+        $decoded = $json ? json_decode($json, true) : null;
+
+        if (!is_array($decoded)) {
+            return $defaults;
+        }
+
+        $normalized = [];
+
+        foreach ($defaults as $event => $channels) {
+            $normalized[$event] = [];
+            foreach ($channels as $channel => $defaultValue) {
+                $normalized[$event][$channel] = isset($decoded[$event][$channel])
+                    ? (bool) $decoded[$event][$channel]
+                    : $defaultValue;
+            }
+        }
+
+        return $normalized;
     }
 
     public function data(Request $request)

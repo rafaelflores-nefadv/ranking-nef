@@ -40,7 +40,7 @@
                         </a>
                         @endcan
                         @can('delete', $team)
-                        <form method="POST" action="{{ route('teams.destroy', $team) }}" class="inline" onsubmit="return confirm('Tem certeza que deseja excluir esta equipe?');">
+                        <form method="POST" action="{{ route('teams.destroy', $team) }}" class="inline" onsubmit="return handleDeleteConfirm(event, 'Tem certeza que deseja excluir esta equipe?', 'Excluir equipe');">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="text-red-400 hover:text-red-300">

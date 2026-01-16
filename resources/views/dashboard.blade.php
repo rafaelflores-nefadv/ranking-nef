@@ -113,22 +113,14 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <a href="{{ route('sellers.index') }}" class="flex items-center gap-2 px-3 py-2 bg-slate-800/50 border border-slate-700 text-white rounded-lg hover:bg-slate-700">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <line x1="19" x2="19" y1="8" y2="14"></line>
-                        <line x1="22" x2="16" y1="11" y2="11"></line>
+                <button id="toggle-sound-btn" class="p-2 bg-slate-800/50 border border-slate-700 text-white rounded-lg hover:bg-slate-700 transition-colors" title="Alternar som">
+                    <svg id="sound-icon-on" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                     </svg>
-                    Vendedor
-                </a>
-
-                <button class="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-700 hover:to-blue-600">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path d="M5 12h14"></path>
-                        <path d="M12 5v14"></path>
+                    <svg id="sound-icon-off" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
                     </svg>
-                    Nova {{ $saleTerm }}
                 </button>
             </div>
         </div>
@@ -426,9 +418,29 @@
 
     // Notificações de vendas em tempo real (polling)
     const notificationsEnabled = @json((($configs['notifications_system_enabled'] ?? 'true') === 'true'));
+    const SOUND_STORAGE_KEY = 'dashboard_sound_enabled';
+    let soundEnabled = localStorage.getItem(SOUND_STORAGE_KEY);
+    if (soundEnabled === null) {
+        soundEnabled = @json((($configs['notifications_sound_enabled'] ?? 'true') === 'true'));
+        localStorage.setItem(SOUND_STORAGE_KEY, soundEnabled);
+    } else {
+        soundEnabled = soundEnabled === 'true';
+    }
     const notificationsContainer = document.getElementById('sale-notifications');
     const SALES_STORAGE_KEY = 'ranking_sales_last_timestamp';
     const SALES_POLLING_INTERVAL = 4000;
+
+    // Configurações de sons
+    const soundsConfig = @json(json_decode($configs['notifications_sounds_config'] ?? '{}', true) ?: []);
+    const customSoundsPaths = @json(json_decode($configs['notifications_custom_sounds'] ?? '{}', true) ?: []);
+    const customSounds = {};
+    @php
+        $customSoundsPaths = json_decode($configs['notifications_custom_sounds'] ?? '{}', true) ?: [];
+    @endphp
+    @foreach($customSoundsPaths as $eventKey => $filePath)
+        customSounds['{{ $eventKey }}'] = '{{ asset("storage/" . $filePath) }}';
+    @endforeach
+    const notificationEventsConfig = @json($notificationEventsConfig ?? []);
 
     let lastSaleTimestamp =
         localStorage.getItem(SALES_STORAGE_KEY) ||
@@ -483,6 +495,9 @@
 
         notificationsContainer.appendChild(toast);
 
+        // Tocar som quando a notificação é exibida na tela
+        playNotificationSound('sale_registered');
+
         setTimeout(() => {
             if (toast.isConnected) {
                 toast.remove();
@@ -494,9 +509,89 @@
         showNextToast();
     };
 
+    // AudioContext global para evitar problemas de autoplay
+    let globalAudioContext = null;
+    
+    function getAudioContext() {
+        if (!globalAudioContext) {
+            globalAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        // Resumir contexto se estiver suspenso (necessário para autoplay)
+        if (globalAudioContext.state === 'suspended') {
+            globalAudioContext.resume();
+        }
+        return globalAudioContext;
+    }
+
+    // Função para tocar som padrão
+    function playSound(type) {
+        try {
+            const audioContext = getAudioContext();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            const frequencies = {
+                'notification': 800,
+                'success': 1000,
+                'error': 400,
+                'warning': 600,
+                'info': 700,
+            };
+
+            oscillator.frequency.value = frequencies[type] || 800;
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.5);
+        } catch (error) {
+            console.error('Erro ao tocar som padrão:', error);
+        }
+    }
+
+    // Função para tocar som personalizado (MP3)
+    function playCustomSound(fileUrl) {
+        try {
+            const audio = new Audio(fileUrl);
+            audio.volume = 0.7;
+            audio.play().catch(error => {
+                console.error('Erro ao tocar som personalizado:', error);
+            });
+        } catch (error) {
+            console.error('Erro ao criar áudio personalizado:', error);
+        }
+    }
+
+    // Função para tocar som de notificação baseado no evento
+    function playNotificationSound(eventKey) {
+        if (!soundEnabled) return;
+        
+        // Verificar se o som está habilitado para este evento
+        const eventConfig = notificationEventsConfig[eventKey];
+        if (!eventConfig || !eventConfig.sound) {
+            return;
+        }
+
+        // Obter o tipo de som configurado
+        const soundType = soundsConfig[eventKey] || 'notification';
+        
+        if (soundType === 'custom' && customSounds[eventKey]) {
+            // Tocar arquivo personalizado
+            playCustomSound(customSounds[eventKey]);
+        } else {
+            // Tocar som padrão
+            playSound(soundType);
+        }
+    }
+
     const createSaleToast = (sale) => {
         if (!notificationsContainer) return;
 
+        // Adicionar à fila - o som será tocado quando a notificação aparecer na tela
         toastQueue.push(sale);
         showNextToast();
     };
@@ -534,6 +629,58 @@
             console.error('Erro ao buscar vendas recentes:', error);
         }
     };
+
+    // Inicializar AudioContext quando a página carregar
+    if (soundEnabled) {
+        // Tentar inicializar o AudioContext imediatamente
+        try {
+            getAudioContext();
+        } catch (error) {
+            console.log('AudioContext não pode ser inicializado ainda:', error);
+        }
+        
+        // Inicializar AudioContext na primeira interação do usuário (necessário para autoplay)
+        const initAudioOnInteraction = () => {
+            getAudioContext();
+            document.removeEventListener('click', initAudioOnInteraction);
+            document.removeEventListener('touchstart', initAudioOnInteraction);
+            document.removeEventListener('keydown', initAudioOnInteraction);
+        };
+        
+        document.addEventListener('click', initAudioOnInteraction, { once: true });
+        document.addEventListener('touchstart', initAudioOnInteraction, { once: true });
+        document.addEventListener('keydown', initAudioOnInteraction, { once: true });
+    }
+
+    // Botão de toggle de som
+    const toggleSoundBtn = document.getElementById('toggle-sound-btn');
+    const soundIconOn = document.getElementById('sound-icon-on');
+    const soundIconOff = document.getElementById('sound-icon-off');
+
+    const updateSoundButton = () => {
+        if (soundEnabled) {
+            soundIconOn.style.display = 'block';
+            soundIconOff.style.display = 'none';
+            toggleSoundBtn.setAttribute('title', 'Som ativo - Clique para desativar');
+            toggleSoundBtn.classList.remove('bg-slate-800/50');
+            toggleSoundBtn.classList.add('bg-green-600/20', 'border-green-500/50');
+        } else {
+            soundIconOn.style.display = 'none';
+            soundIconOff.style.display = 'block';
+            toggleSoundBtn.setAttribute('title', 'Som desativado - Clique para ativar');
+            toggleSoundBtn.classList.remove('bg-green-600/20', 'border-green-500/50');
+            toggleSoundBtn.classList.add('bg-slate-800/50');
+        }
+    };
+
+    if (toggleSoundBtn) {
+        toggleSoundBtn.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            localStorage.setItem(SOUND_STORAGE_KEY, soundEnabled);
+            updateSoundButton();
+        });
+        updateSoundButton();
+    }
 
     if (notificationsEnabled) {
         fetchRecentSales();
@@ -579,32 +726,6 @@
         transition: opacity 300ms ease, transform 300ms ease;
     }
 
-    html, body {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(59, 130, 246, 0.6) rgba(15, 23, 42, 0.6);
-    }
-
-    html::-webkit-scrollbar,
-    body::-webkit-scrollbar {
-        width: 10px;
-    }
-
-    html::-webkit-scrollbar-track,
-    body::-webkit-scrollbar-track {
-        background: rgba(15, 23, 42, 0.6);
-    }
-
-    html::-webkit-scrollbar-thumb,
-    body::-webkit-scrollbar-thumb {
-        background: rgba(59, 130, 246, 0.6);
-        border-radius: 999px;
-        border: 2px solid rgba(15, 23, 42, 0.6);
-    }
-
-    html::-webkit-scrollbar-thumb:hover,
-    body::-webkit-scrollbar-thumb:hover {
-        background: rgba(59, 130, 246, 0.85);
-    }
 
     @keyframes podium-float {
         0%, 100% {

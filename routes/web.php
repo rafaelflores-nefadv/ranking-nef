@@ -33,8 +33,16 @@ Route::middleware('auth')->group(function () {
         ->name('settings.notifications.voice.update');
     Route::post('/settings/notifications/voice/test', [SettingsController::class, 'testVoice'])
         ->name('settings.notifications.voice.test');
+    Route::put('/settings/notifications/sounds', [SettingsController::class, 'updateSoundSettings'])
+        ->name('settings.notifications.sounds.update');
+    Route::delete('/settings/notifications/sounds/{eventKey}', [SettingsController::class, 'removeCustomSound'])
+        ->name('settings.notifications.sounds.remove');
+    Route::post('/settings/score-rules', [SettingsController::class, 'storeScoreRule'])
+        ->name('settings.score-rules.store');
     Route::put('/settings/score-rules/{scoreRule}', [SettingsController::class, 'updateScoreRule'])
         ->name('settings.score-rules.update');
+    Route::delete('/settings/score-rules/{scoreRule}', [SettingsController::class, 'destroyScoreRule'])
+        ->name('settings.score-rules.destroy');
     Route::put('/settings/general', [SettingsController::class, 'updateGeneral'])
         ->name('settings.general.update');
     Route::put('/settings/seasons-options', [SettingsController::class, 'updateSeasonOptions'])

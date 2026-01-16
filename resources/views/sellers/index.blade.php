@@ -74,7 +74,7 @@
                                     <a href="{{ route('sellers.edit', $seller) }}" class="text-yellow-400 hover:text-yellow-300">Editar</a>
                                     @endcan
                                     @can('delete', $seller)
-                                    <form method="POST" action="{{ route('sellers.destroy', $seller) }}" class="inline" onsubmit="return confirm('Tem certeza que deseja excluir este vendedor?');">
+                                    <form method="POST" action="{{ route('sellers.destroy', $seller) }}" class="inline" onsubmit="return handleDeleteConfirm(event, 'Tem certeza que deseja excluir este vendedor?', 'Excluir vendedor');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-red-400 hover:text-red-300">Excluir</button>

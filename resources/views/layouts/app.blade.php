@@ -14,8 +14,232 @@
     <!-- Styles -->
     @vite(['resources/css/app.css'])
     @stack('styles')
+    <style>
+        /* Scrollbar customizada global */
+        html, body {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(59, 130, 246, 0.6) rgba(15, 23, 42, 0.6);
+        }
+
+        html::-webkit-scrollbar,
+        body::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        html::-webkit-scrollbar-track,
+        body::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+
+        html::-webkit-scrollbar-thumb,
+        body::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.6);
+            border-radius: 999px;
+            border: 2px solid rgba(15, 23, 42, 0.6);
+        }
+
+        html::-webkit-scrollbar-thumb:hover,
+        body::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.85);
+        }
+
+        /* Scrollbar customizada para elementos com overflow */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(59, 130, 246, 0.6) rgba(15, 23, 42, 0.6);
+        }
+
+        *::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        *::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+
+        *::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.6);
+            border-radius: 999px;
+            border: 2px solid rgba(15, 23, 42, 0.6);
+        }
+
+        *::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.85);
+        }
+    </style>
 </head>
 <body class="font-sans antialiased bg-[#0a0e1a] min-h-screen">
+    <!-- Modais personalizados -->
+    <div id="custom-alert-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeCustomAlert()"></div>
+        <div class="relative bg-slate-900/95 border border-slate-700/60 rounded-xl shadow-xl backdrop-blur-sm p-6 max-w-md w-full">
+            <div class="flex items-start gap-4">
+                <div id="alert-icon" class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"></div>
+                <div class="flex-1">
+                    <h3 id="alert-title" class="text-lg font-semibold text-white mb-2"></h3>
+                    <p id="alert-message" class="text-slate-300 text-sm mb-4"></p>
+                    <div class="flex justify-end">
+                        <button onclick="closeCustomAlert()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-confirm-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeCustomConfirm(false)"></div>
+        <div class="relative bg-slate-900/95 border border-slate-700/60 rounded-xl shadow-xl backdrop-blur-sm p-6 max-w-md w-full">
+            <div class="flex items-start gap-4">
+                <div id="confirm-icon" class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-yellow-600/20">
+                    <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div class="flex-1">
+                    <h3 id="confirm-title" class="text-lg font-semibold text-white mb-2">Confirmar ação</h3>
+                    <p id="confirm-message" class="text-slate-300 text-sm mb-4"></p>
+                    <div class="flex justify-end gap-2">
+                        <button onclick="closeCustomConfirm(false)" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold">
+                            Cancelar
+                        </button>
+                        <button onclick="closeCustomConfirm(true)" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">
+                            Confirmar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sistema de alertas e confirmações personalizados
+        let customConfirmResolve = null;
+
+        function showCustomAlert(title, message, type = 'info') {
+            const modal = document.getElementById('custom-alert-modal');
+            const alertTitle = document.getElementById('alert-title');
+            const alertMessage = document.getElementById('alert-message');
+            const alertIcon = document.getElementById('alert-icon');
+
+            alertTitle.textContent = title || 'Aviso';
+            alertMessage.textContent = message || '';
+
+            // Configurar ícone baseado no tipo
+            alertIcon.className = 'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center';
+            alertIcon.innerHTML = '';
+
+            const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            iconSvg.setAttribute('class', 'w-6 h-6');
+            iconSvg.setAttribute('fill', 'none');
+            iconSvg.setAttribute('stroke', 'currentColor');
+            iconSvg.setAttribute('viewBox', '0 0 24 24');
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            path.setAttribute('stroke-width', '2');
+
+            if (type === 'error' || type === 'danger') {
+                alertIcon.classList.add('bg-red-600/20');
+                path.setAttribute('d', 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z');
+                iconSvg.classList.add('text-red-400');
+            } else if (type === 'success') {
+                alertIcon.classList.add('bg-green-600/20');
+                path.setAttribute('d', 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z');
+                iconSvg.classList.add('text-green-400');
+            } else if (type === 'warning') {
+                alertIcon.classList.add('bg-yellow-600/20');
+                path.setAttribute('d', 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z');
+                iconSvg.classList.add('text-yellow-400');
+            } else {
+                alertIcon.classList.add('bg-blue-600/20');
+                path.setAttribute('d', 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z');
+                iconSvg.classList.add('text-blue-400');
+            }
+
+            iconSvg.appendChild(path);
+            alertIcon.appendChild(iconSvg);
+
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+
+            // Fechar com ESC
+            const handleEsc = (e) => {
+                if (e.key === 'Escape') {
+                    closeCustomAlert();
+                    document.removeEventListener('keydown', handleEsc);
+                }
+            };
+            document.addEventListener('keydown', handleEsc);
+        }
+
+        function closeCustomAlert() {
+            const modal = document.getElementById('custom-alert-modal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        function showCustomConfirm(message, title = 'Confirmar ação') {
+            return new Promise((resolve) => {
+                customConfirmResolve = resolve;
+                const modal = document.getElementById('custom-confirm-modal');
+                const confirmTitle = document.getElementById('confirm-title');
+                const confirmMessage = document.getElementById('confirm-message');
+
+                confirmTitle.textContent = title;
+                confirmMessage.textContent = message || 'Tem certeza que deseja continuar?';
+
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+
+                // Fechar com ESC (cancela)
+                const handleEsc = (e) => {
+                    if (e.key === 'Escape') {
+                        closeCustomConfirm(false);
+                        document.removeEventListener('keydown', handleEsc);
+                    }
+                };
+                document.addEventListener('keydown', handleEsc);
+            });
+        }
+
+        function closeCustomConfirm(result) {
+            const modal = document.getElementById('custom-confirm-modal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+            
+            if (customConfirmResolve) {
+                customConfirmResolve(result);
+                customConfirmResolve = null;
+            }
+        }
+
+        // Substituir alert() e confirm() padrão
+        window.originalAlert = window.alert;
+        window.originalConfirm = window.confirm;
+
+        window.alert = function(message) {
+            showCustomAlert('Aviso', message, 'info');
+        };
+
+        window.confirm = function(message) {
+            return showCustomConfirm(message, 'Confirmar ação');
+        };
+
+        // Função auxiliar para formulários com onsubmit
+        async function handleDeleteConfirm(event, message, title = 'Confirmar exclusão') {
+            event.preventDefault();
+            const form = event.target;
+            const confirmed = await showCustomConfirm(message, title);
+            if (confirmed) {
+                form.submit();
+            }
+            return false;
+        }
+    </script>
     @auth
         @include('components.navigation')
     @endauth
@@ -94,7 +318,11 @@
 
                 if (unread > 0) {
                     badge.classList.remove('hidden');
-                    badge.textContent = unread > 9 ? '9+' : String(unread);
+                    if (unread > 3) {
+                        badge.textContent = '3+';
+                    } else {
+                        badge.textContent = String(unread);
+                    }
                 } else {
                     badge.classList.add('hidden');
                     badge.textContent = '';
@@ -103,7 +331,7 @@
 
             const fetchNotifications = async () => {
                 try {
-                    const response = await fetch('/scores/recent?limit=3', {
+                    const response = await fetch('/scores/recent?limit=20', {
                         headers: { 'Accept': 'application/json' },
                     });
 
@@ -113,7 +341,10 @@
                     const items = result?.data || [];
                     latestTimestamp = items[0]?.created_at || latestTimestamp;
 
-                    renderNotifications(items);
+                    // Mostra apenas as 3 mais recentes no dropdown
+                    const displayItems = items.slice(0, 3);
+                    renderNotifications(displayItems);
+                    // Mas usa todas as items para calcular o badge corretamente
                     updateBadge(items);
                 } catch (error) {
                     console.error('Erro ao buscar notificações:', error);
