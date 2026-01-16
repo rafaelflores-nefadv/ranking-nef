@@ -16,14 +16,32 @@ class DashboardController extends Controller
         private GamificationService $gamificationService
     ) {}
 
-    private function buildDashboardData(?string $teamId): array
+    private function buildDashboardData(?string $teamId, ?array $allowedTeamIds = null): array
     {
-        $teams = Team::orderBy('name')->get(['id', 'name']);
+        // Filtrar equipes baseado no papel do usuário
+        $teamsQuery = Team::orderBy('name');
+        if ($allowedTeamIds !== null) {
+            // Supervisor: apenas suas equipes
+            $teamsQuery->whereIn('id', $allowedTeamIds);
+        }
+        $teams = $teamsQuery->get(['id', 'name']);
+        
         $activeTeam = $teamId ? $teams->firstWhere('id', $teamId) : null;
 
         $sellersQuery = Seller::with(['team', 'season']);
+        
+        // Filtrar por equipe selecionada ou equipes permitidas
         if ($teamId) {
-            $sellersQuery->where('team_id', $teamId);
+            // Verificar se a equipe selecionada está nas permitidas
+            if ($allowedTeamIds === null || in_array($teamId, $allowedTeamIds)) {
+                $sellersQuery->where('team_id', $teamId);
+            } else {
+                // Se não tem permissão, não retornar vendedores
+                $sellersQuery->whereRaw('1 = 0');
+            }
+        } elseif ($allowedTeamIds !== null) {
+            // Supervisor sem equipe selecionada: mostrar todas as suas equipes
+            $sellersQuery->whereIn('team_id', $allowedTeamIds);
         }
 
         $sellers = $sellersQuery
@@ -69,7 +87,8 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $data = $this->buildDashboardData($request->query('team'));
+        $allowedTeamIds = $user->getSupervisedTeamIds();
+        $data = $this->buildDashboardData($request->query('team'), $allowedTeamIds);
         $configs = Config::all()->pluck('value', 'key');
         
         // Normalizar configuração de eventos de notificação
@@ -140,7 +159,9 @@ class DashboardController extends Controller
 
     public function data(Request $request)
     {
-        $data = $this->buildDashboardData($request->query('team'));
+        $user = $request->user();
+        $allowedTeamIds = $user->getSupervisedTeamIds();
+        $data = $this->buildDashboardData($request->query('team'), $allowedTeamIds);
 
         return response()->json([
             'activeTeamName' => $data['activeTeam']?->name,

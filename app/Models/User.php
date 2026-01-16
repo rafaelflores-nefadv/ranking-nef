@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -23,6 +24,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'is_active',
     ];
 
     /**
@@ -45,6 +47,32 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Get the teams that the user supervises.
+     */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'team_user');
+    }
+
+    /**
+     * Get the IDs of teams that the user supervises.
+     * Returns null for admin (all teams) or array of team IDs for supervisor.
+     */
+    public function getSupervisedTeamIds(): ?array
+    {
+        if ($this->role === 'admin') {
+            return null; // Admin vê todas as equipes
+        }
+        
+        if ($this->role === 'supervisor') {
+            return $this->teams()->pluck('teams.id')->toArray();
+        }
+        
+        return []; // Outros roles não veem equipes
     }
 }

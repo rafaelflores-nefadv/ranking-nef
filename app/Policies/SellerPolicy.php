@@ -21,8 +21,23 @@ class SellerPolicy
      */
     public function view(User $user, Seller $seller): bool
     {
-        // admin, supervisor e user podem ver
-        return in_array($user->role, ['admin', 'supervisor', 'user']);
+        // user pode ver todos
+        if ($user->role === 'user') {
+            return true;
+        }
+        
+        // admin pode ver todos
+        if ($user->role === 'admin') {
+            return true;
+        }
+        
+        // supervisor só pode ver vendedores das suas equipes
+        if ($user->role === 'supervisor') {
+            $allowedTeamIds = $user->getSupervisedTeamIds();
+            return in_array($seller->team_id, $allowedTeamIds);
+        }
+        
+        return false;
     }
 
     /**
@@ -39,8 +54,18 @@ class SellerPolicy
      */
     public function update(User $user, Seller $seller): bool
     {
-        // admin e supervisor podem editar
-        return in_array($user->role, ['admin', 'supervisor']);
+        // admin pode editar todos
+        if ($user->role === 'admin') {
+            return true;
+        }
+        
+        // supervisor só pode editar vendedores das suas equipes
+        if ($user->role === 'supervisor') {
+            $allowedTeamIds = $user->getSupervisedTeamIds();
+            return in_array($seller->team_id, $allowedTeamIds);
+        }
+        
+        return false;
     }
 
     /**

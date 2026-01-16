@@ -36,7 +36,7 @@
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 14a4 4 0 1 0-8 0m12 6v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path>
                                 </svg>
-                                Colaboradores
+                                Vendedores
                             </span>
                         </a>
                     @endif

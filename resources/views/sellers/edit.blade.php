@@ -7,7 +7,7 @@
     <div class="max-w-2xl mx-auto">
         <div class="mb-6">
             <h1 class="text-3xl font-bold text-white mb-2">Editar Vendedor</h1>
-            <p class="text-slate-400">Atualize as informações do vendedor</p>
+            <p class="text-slate-400">Atualize as informações do Vendedor</p>
         </div>
 
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">

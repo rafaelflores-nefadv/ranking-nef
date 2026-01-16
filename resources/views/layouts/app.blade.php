@@ -286,7 +286,7 @@
                 empty.classList.add('hidden');
 
                 items.forEach((sale) => {
-                    const sellerName = sale?.seller?.name || 'Vendedor';
+                    const sellerName = sale?.seller?.name || 'Colaborador';
                     const occurrenceLabel = sale?.occurrence?.description || sale?.occurrence?.type || `${saleTerm} registrada`;
                     const pointsLabel = formatPoints(sale?.points);
                     const timeLabel = formatTime(sale?.created_at);

@@ -29,6 +29,9 @@
                 <button type="button" data-tab-button="notificacoes" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
                     Notificações
                 </button>
+                <button type="button" data-tab-button="usuarios" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
+                    Usuários
+                </button>
                 @if(($configs['notifications_sound_enabled'] ?? 'true') === 'true')
                 <button type="button" data-tab-button="sons" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
                     Sons
@@ -473,7 +476,7 @@
                         @method('PUT')
                         <div class="mb-4">
                             <h3 class="text-lg font-semibold text-white">Leitura por Voz do Ranking</h3>
-                            <p class="text-slate-400 text-sm">Leitura periodica dos Top 3 do ranking.</p>
+                            <p class="text-slate-400 text-sm">Leitura periódica dos Top 3 do ranking.</p>
                         </div>
                         <label class="flex items-center justify-between gap-4 p-4 rounded-lg bg-slate-800/50 border border-slate-700/60">
                             <div>
@@ -550,9 +553,9 @@
                                 name="notifications_voice_browser_name"
                                 class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
                             >
-                                <option value="">Automatica (padrao do navegador)</option>
+                                <option value="">Automática (padrão do navegador)</option>
                             </select>
-                            <p class="text-slate-400 text-xs mt-2">Disponivel apenas quando a pagina esta aberta.</p>
+                            <p class="text-slate-400 text-xs mt-2">Disponível apenas quando a página está aberta.</p>
                         </label>
                         <label class="flex items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/60">
                             <input
@@ -562,7 +565,7 @@
                                 class="h-4 w-4 accent-blue-600"
                                 {{ ($configs['notifications_voice_only_when_changed'] ?? 'false') === 'true' ? 'checked' : '' }}
                             />
-                            <span class="text-slate-200">Somente se houver mudanca no ranking</span>
+                            <span class="text-slate-200">Somente se houver mudança no ranking</span>
                         </label>
                         <div class="mt-6 pt-6 border-t border-slate-800/60 flex justify-end gap-2">
                             <button type="button" id="test-voice-btn" class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold">
@@ -573,6 +576,25 @@
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            <!-- Usuários -->
+            <div data-tab="usuarios" class="settings-tab hidden bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
+                <div class="mb-4">
+                    <h2 class="text-xl font-bold text-white">Usuários do Sistema</h2>
+                    <p class="text-slate-400 text-sm">Gerencie os usuários que podem acessar o sistema (Administradores e Supervisores).</p>
+                </div>
+                <div class="mb-4">
+                    <a href="{{ route('users.index') }}" class="inline-block px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
+                        Gerenciar Usuários
+                    </a>
+                </div>
+                <div class="bg-slate-800/50 rounded-lg p-4 border border-slate-700/60">
+                    <p class="text-slate-300 text-sm">
+                        <strong class="text-white">Administradores:</strong> Acesso completo ao sistema, incluindo todas as configurações.<br>
+                        <strong class="text-white">Supervisores:</strong> Podem gerenciar colaboradores e equipes, mas não têm acesso às configurações do sistema.
+                    </p>
                 </div>
             </div>
 
@@ -726,7 +748,7 @@
                 if (!voices.length) return;
 
                 const currentValue = voiceSelect.value;
-                voiceSelect.innerHTML = '<option value="">Automatica (padrao do navegador)</option>';
+                voiceSelect.innerHTML = '<option value="">Automática (padrão do navegador)</option>';
 
                 voices.forEach((voice) => {
                     const option = document.createElement('option');

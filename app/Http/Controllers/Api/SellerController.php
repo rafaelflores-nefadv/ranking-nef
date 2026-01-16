@@ -12,11 +12,21 @@ class SellerController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Seller::class);
         
-        $sellers = Seller::with(['team', 'season'])->get();
+        $user = $request->user();
+        $allowedTeamIds = $user->getSupervisedTeamIds();
+        
+        $sellersQuery = Seller::with(['team', 'season']);
+        
+        // Filtrar vendedores baseado nas equipes do supervisor
+        if ($allowedTeamIds !== null) {
+            $sellersQuery->whereIn('team_id', $allowedTeamIds);
+        }
+        
+        $sellers = $sellersQuery->get();
         return response()->json($sellers);
     }
 

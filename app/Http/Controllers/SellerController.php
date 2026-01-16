@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreSellerRequest;
+use App\Http\Requests\UpdateSellerRequest;
 use App\Models\Seller;
 use App\Models\Team;
 use App\Models\Season;
@@ -14,39 +16,54 @@ class SellerController extends Controller
     {
         $this->authorize('viewAny', Seller::class);
 
-        $sellers = Seller::with(['team', 'season'])
+        $user = $request->user();
+        $allowedTeamIds = $user->getSupervisedTeamIds();
+
+        $sellersQuery = Seller::with(['team', 'season']);
+        
+        // Filtrar vendedores baseado nas equipes do supervisor
+        if ($allowedTeamIds !== null) {
+            $sellersQuery->whereIn('team_id', $allowedTeamIds);
+        }
+        
+        $sellers = $sellersQuery
             ->orderBy('points', 'desc')
             ->paginate(20);
 
-        $teams = Team::all();
+        // Filtrar equipes também
+        $teamsQuery = Team::orderBy('name');
+        if ($allowedTeamIds !== null) {
+            $teamsQuery->whereIn('id', $allowedTeamIds);
+        }
+        $teams = $teamsQuery->get();
+        
         $seasons = Season::all();
 
         return view('sellers.index', compact('sellers', 'teams', 'seasons'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $this->authorize('create', Seller::class);
 
-        $teams = Team::all();
+        $user = $request->user();
+        $allowedTeamIds = $user->getSupervisedTeamIds();
+
+        // Filtrar equipes baseado no papel do usuário
+        $teamsQuery = Team::orderBy('name');
+        if ($allowedTeamIds !== null) {
+            $teamsQuery->whereIn('id', $allowedTeamIds);
+        }
+        $teams = $teamsQuery->get();
+        
         $seasons = Season::all();
 
         return view('sellers.create', compact('teams', 'seasons'));
     }
 
-    public function store(Request $request)
+    public function store(StoreSellerRequest $request)
     {
-        $this->authorize('create', Seller::class);
-
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:sellers,email',
-            'team_id' => 'nullable|exists:teams,id',
-            'season_id' => 'nullable|exists:seasons,id',
-            'status' => 'required|in:active,inactive',
-        ]);
-
-        Seller::create($validated);
+        Seller::create($request->validated());
 
         return redirect()->route('sellers.index')
             ->with('success', 'Vendedor criado com sucesso!');
@@ -61,32 +78,31 @@ class SellerController extends Controller
         return view('sellers.show', compact('seller'));
     }
 
-    public function edit(Seller $seller)
+    public function edit(Request $request, Seller $seller)
     {
         $this->authorize('update', $seller);
 
-        $teams = Team::all();
+        $user = $request->user();
+        $allowedTeamIds = $user->getSupervisedTeamIds();
+
+        // Filtrar equipes baseado no papel do usuário
+        $teamsQuery = Team::orderBy('name');
+        if ($allowedTeamIds !== null) {
+            $teamsQuery->whereIn('id', $allowedTeamIds);
+        }
+        $teams = $teamsQuery->get();
+        
         $seasons = Season::all();
 
         return view('sellers.edit', compact('seller', 'teams', 'seasons'));
     }
 
-    public function update(Request $request, Seller $seller)
+    public function update(UpdateSellerRequest $request, Seller $seller)
     {
-        $this->authorize('update', $seller);
-
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:sellers,email,' . $seller->id,
-            'team_id' => 'nullable|exists:teams,id',
-            'season_id' => 'nullable|exists:seasons,id',
-            'status' => 'required|in:active,inactive',
-        ]);
-
-        $seller->update($validated);
+        $seller->update($request->validated());
 
         return redirect()->route('sellers.index')
-            ->with('success', 'Vendedor atualizado com sucesso!');
+            ->with('success', 'Colaborador atualizado com sucesso!');
     }
 
     public function destroy(Seller $seller)
@@ -96,6 +112,6 @@ class SellerController extends Controller
         $seller->delete();
 
         return redirect()->route('sellers.index')
-            ->with('success', 'Vendedor excluído com sucesso!');
+            ->with('success', 'Colaborador excluído com sucesso!');
     }
 }

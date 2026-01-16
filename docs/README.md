@@ -38,14 +38,23 @@ frontend em Blade (renderizacao no servidor). O frontend **nao** usa React.
 
 ## Usuarios de teste (seed)
 Senha padrao: `password`
-- `admin@nef.local` (admin)
-- `supervisor@nef.local` (supervisor)
-- `user@nef.local` (user)
+- `admin@nef.local` (admin) - Acesso completo ao sistema
+- `supervisor@nef.local` (supervisor) - Acesso restrito às equipes atribuídas
+- `user@nef.local` (user) - Acesso apenas para visualização
 
 ## Funcionalidades
 - Dashboard com ranking, top 3, estatisticas e filtro por equipe.
-- CRUD de vendedores.
+- CRUD de vendedores (colaboradores).
 - CRUD de equipes.
+- **Gerenciamento de usuarios** (apenas admin):
+  - Criar, editar, desativar e excluir usuarios
+  - Atribuir perfis (admin, supervisor)
+  - Para supervisores: associar uma ou mais equipes
+  - Redefinicao de senha com validacao de forca
+- **Controle de acesso baseado em equipes**:
+  - Supervisores veem apenas dados das equipes pelas quais sao responsaveis
+  - Dashboard, vendedores e equipes filtrados automaticamente
+  - Policies garantem acesso apenas aos recursos permitidos
 - Configuracoes administrativas:
   - regras de pontuacao
   - notificacoes
@@ -59,6 +68,11 @@ Senha padrao: `password`
 - `/dashboard/data` dados do dashboard (JSON para recarregar blocos)
 - `/sellers` vendedores (CRUD)
 - `/teams` equipes (CRUD)
+- `/users` gerenciamento de usuarios (apenas admin)
+  - `/users/create` criar usuario
+  - `/users/{user}/edit` editar usuario
+  - `/users/{user}/reset-password` redefinir senha
+  - `/users/{user}/toggle-status` ativar/desativar usuario
 - `/settings` configuracoes (apenas admin)
 - `/notifications` historico de notificacoes
 - rotas de auth em `routes/auth.php` (login, register, etc.)
@@ -89,7 +103,8 @@ Resposta:
 ```
 
 ## Modelo de dados (resumo)
-- `users`: nome, email, senha, role (admin/supervisor/user)
+- `users`: nome, email, senha, role (admin/supervisor/user), is_active
+- `team_user`: tabela pivot para relacionar supervisores com equipes
 - `teams`: equipes
 - `seasons`: temporadas (ativa ou nao)
 - `sellers`: vendedores (team_id, season_id, pontos, status)
@@ -97,6 +112,27 @@ Resposta:
 - `scores`: historico de pontos por vendedor
 - `api_occurrences`: buffer de ocorrencias recebidas via webhook
 - `configs`: configuracoes chave/valor
+
+## Perfis de usuario e permissoes
+
+### Admin
+- Acesso completo ao sistema
+- Pode gerenciar usuarios (criar, editar, desativar, excluir)
+- Pode ver e gerenciar todas as equipes e vendedores
+- Acesso as configuracoes do sistema
+
+### Supervisor
+- Acesso restrito às equipes atribuídas
+- Pode ver e editar apenas vendedores das suas equipes
+- Pode ver apenas as equipes pelas quais é responsável
+- Dashboard mostra apenas dados das suas equipes
+- Não tem acesso às configurações do sistema
+- Não pode criar ou excluir vendedores/equipes
+
+### User
+- Acesso apenas para visualização
+- Pode ver todos os vendedores e equipes (sem filtros)
+- Não pode criar, editar ou excluir recursos
 
 ## Fluxo de pontuacao
 1. Ocorrencia chega via webhook e vira `api_occurrences`.
@@ -149,6 +185,30 @@ O historico das leituras fica em `notification_histories` com:
 - `php artisan migrate:fresh --seed` recria base do zero
 - `php artisan cache:clear`, `config:clear`, `route:clear`, `view:clear`
 
+## Gerenciamento de usuarios
+
+### Criar usuario
+1. Acesse `/users/create` (apenas admin)
+2. Preencha nome, email, perfil e senha
+3. Se for supervisor, selecione uma ou mais equipes
+4. Senha deve ter: min 8 caracteres, maiúscula, minúscula, número e caractere especial
+
+### Editar usuario
+1. Acesse `/users/{user}/edit`
+2. Altere nome, email ou perfil
+3. Se mudar para supervisor, selecione as equipes
+4. Se mudar de supervisor para admin, as equipes são removidas automaticamente
+
+### Redefinir senha
+1. Acesse `/users/{user}/reset-password`
+2. Defina nova senha com confirmação
+3. Validação de força aplicada
+
+### Ativar/Desativar usuario
+- Use o botão de toggle na listagem de usuarios
+- Usuario desativado não pode fazer login
+- Não é possível desativar o próprio usuario
+
 ## Performance
 Indices relevantes estao descritos em `PERFORMANCE.md`.
 Para producao:
@@ -160,19 +220,26 @@ Para producao:
 ```
 app/
   Console/Commands/
-  Http/Controllers/
+  Http/
+    Controllers/
+      Api/        # Controllers de API
+    Requests/     # Form Requests (validação)
   Jobs/
   Models/
-  Policies/
+  Policies/       # Policies de autorização
   Services/
 resources/
-  views/          # Blade
+  views/          # Blade templates (não usa React)
+  css/
+  js/             # Apenas Alpine.js e axios (sem React)
 routes/
   web.php
   api.php
+  auth.php
 database/
   migrations/
   seeders/
+docs/             # Documentação
 ```
 
 ## Testes

@@ -19,6 +19,9 @@ class RankingController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $allowedTeamIds = $user->getSupervisedTeamIds();
+        
         $seasonId = $request->query('season_id');
         $teamId = $request->query('team_id');
 
@@ -26,12 +29,23 @@ class RankingController extends Controller
             ->where('status', 'active')
             ->orderBy('points', 'desc');
 
+        // Filtrar vendedores baseado nas equipes do supervisor
+        if ($allowedTeamIds !== null) {
+            $query->whereIn('team_id', $allowedTeamIds);
+        }
+
         if ($seasonId) {
             $query->where('season_id', $seasonId);
         }
 
         if ($teamId) {
-            $query->where('team_id', $teamId);
+            // Verificar se a equipe selecionada está nas permitidas
+            if ($allowedTeamIds === null || in_array($teamId, $allowedTeamIds)) {
+                $query->where('team_id', $teamId);
+            } else {
+                // Se não tem permissão, não retornar vendedores
+                $query->whereRaw('1 = 0');
+            }
         }
 
         $sellers = $query->get();

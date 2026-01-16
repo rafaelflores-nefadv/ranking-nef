@@ -12,11 +12,21 @@ class TeamController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Team::class);
         
-        $teams = Team::with('sellers')->get();
+        $user = $request->user();
+        $allowedTeamIds = $user->getSupervisedTeamIds();
+        
+        $teamsQuery = Team::with('sellers');
+        
+        // Filtrar equipes baseado no papel do usuário
+        if ($allowedTeamIds !== null) {
+            $teamsQuery->whereIn('id', $allowedTeamIds);
+        }
+        
+        $teams = $teamsQuery->get();
         return response()->json($teams);
     }
 

@@ -21,8 +21,18 @@ class TeamPolicy
      */
     public function view(User $user, Team $team): bool
     {
-        // admin e supervisor podem ver
-        return in_array($user->role, ['admin', 'supervisor']);
+        // admin pode ver todas
+        if ($user->role === 'admin') {
+            return true;
+        }
+        
+        // supervisor só pode ver suas equipes
+        if ($user->role === 'supervisor') {
+            $allowedTeamIds = $user->getSupervisedTeamIds();
+            return in_array($team->id, $allowedTeamIds);
+        }
+        
+        return false;
     }
 
     /**

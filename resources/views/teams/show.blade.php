@@ -16,15 +16,15 @@
                 <p class="text-white text-xl">{{ $team->name }}</p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-400 mb-1">Vendedores</label>
-                <p class="text-white">{{ $team->sellers->count() }} vendedores</p>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Colaboradores</label>
+                <p class="text-white">{{ $team->sellers->count() }} colaboradores</p>
             </div>
         </div>
 
         @if($team->sellers->count() > 0)
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
             <div class="p-6 border-b border-slate-700/50">
-                <h2 class="text-xl font-bold text-white">Vendedores da Equipe</h2>
+                <h2 class="text-xl font-bold text-white">Colaboradores da Equipe</h2>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">

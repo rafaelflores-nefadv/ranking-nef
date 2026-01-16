@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Detalhes do Vendedor')
+@section('title', 'Detalhes do Colaborador')
 
 @section('content')
 <div class="min-h-screen bg-[#0a0e1a] p-6">
     <div class="max-w-4xl mx-auto">
         <div class="mb-6">
             <h1 class="text-3xl font-bold text-white mb-2">{{ $seller->name }}</h1>
-            <p class="text-slate-400">Detalhes do vendedor</p>
+            <p class="text-slate-400">Detalhes do colaborador</p>
         </div>
 
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
