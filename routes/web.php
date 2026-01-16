@@ -7,6 +7,11 @@ use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Reports\RankingGeneralController;
+use App\Http\Controllers\Reports\RankingTeamController;
+use App\Http\Controllers\Reports\ScoreEvolutionController;
+use App\Http\Controllers\Reports\OccurrencesController;
+use App\Http\Controllers\Reports\GamificationController;
 use Illuminate\Support\Facades\Route;
 
 // Rotas de autenticação (Laravel Breeze)
@@ -67,4 +72,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('/notifications/voice/recent', [NotificationController::class, 'voiceRecent'])
         ->name('notifications.voice.recent');
+
+    // Relatórios
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/ranking-general', [RankingGeneralController::class, 'index'])->name('ranking-general');
+        Route::get('/ranking-team', [RankingTeamController::class, 'index'])->name('ranking-team');
+        Route::get('/score-evolution', [ScoreEvolutionController::class, 'index'])->name('score-evolution');
+        Route::get('/occurrences', [OccurrencesController::class, 'index'])->name('occurrences');
+        Route::get('/gamification', [GamificationController::class, 'index'])->name('gamification');
+    });
 });

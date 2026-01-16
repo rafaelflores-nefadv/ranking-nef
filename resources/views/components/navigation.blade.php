@@ -50,6 +50,40 @@
                             </span>
                         </a>
                     @endif
+                    @if($user && in_array($user->role, ['admin', 'supervisor', 'user']))
+                        <details class="relative group inline-flex items-center">
+                            <summary class="list-none cursor-pointer inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('reports.*') ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-white hover:border-slate-300' }} text-sm font-medium">
+                                <span class="inline-flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"></path>
+                                    </svg>
+                                    Relatórios
+                                    <svg class="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </span>
+                            </summary>
+                            <div class="absolute left-0 top-full mt-2 w-56 rounded-xl bg-slate-900/95 border border-slate-700/60 shadow-xl backdrop-blur-sm py-2 z-50">
+                                <a href="{{ route('reports.ranking-general') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                    Ranking Geral
+                                </a>
+                                <a href="{{ route('reports.ranking-team') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                    Ranking por Equipe
+                                </a>
+                                <a href="{{ route('reports.score-evolution') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                    Evolução de Pontuação
+                                </a>
+                                @if($user && in_array($user->role, ['admin', 'supervisor']))
+                                    <a href="{{ route('reports.occurrences') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                        Ocorrências
+                                    </a>
+                                @endif
+                                <a href="{{ route('reports.gamification') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                    Gamificação
+                                </a>
+                            </div>
+                        </details>
+                    @endif
                 </div>
             </div>
 
