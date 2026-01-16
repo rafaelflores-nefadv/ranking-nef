@@ -6,16 +6,26 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardAnalyticsController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Goals\GoalController;
 use App\Http\Controllers\Reports\RankingGeneralController;
 use App\Http\Controllers\Reports\RankingTeamController;
 use App\Http\Controllers\Reports\ScoreEvolutionController;
 use App\Http\Controllers\Reports\OccurrencesController;
 use App\Http\Controllers\Reports\GamificationController;
+use App\Http\Controllers\MonitorController;
+use App\Http\Controllers\Admin\MonitorController as AdminMonitorController;
+use App\Http\Controllers\Settings\ApiIntegrationController;
 use Illuminate\Support\Facades\Route;
 
 // Rotas de autenticação (Laravel Breeze)
 require __DIR__.'/auth.php';
+
+// Rotas públicas de monitor
+Route::get('/monitor/{slug}', [MonitorController::class, 'show'])->name('monitor.show');
+Route::get('/monitor/{slug}/data', [MonitorController::class, 'data'])->name('monitor.data');
+Route::get('/monitor/{slug}/voice', [MonitorController::class, 'voiceText'])->name('monitor.voice');
 
 // Rotas protegidas
 Route::middleware('auth')->group(function () {
@@ -23,11 +33,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/data', [DashboardController::class, 'data'])->name('dashboard.data');
     
+    // Dashboard Analytics (apenas admin)
+    Route::get('/dashboard/analytics', [DashboardAnalyticsController::class, 'index'])->name('dashboard.analytics');
+    
     // Sellers
     Route::resource('sellers', SellerController::class);
     
     // Teams
     Route::resource('teams', TeamController::class);
+    
+    // Goals
+    Route::resource('goals', GoalController::class);
+    Route::post('/goals/{goal}/duplicate', [GoalController::class, 'duplicate'])->name('goals.duplicate');
     
     // Users (apenas admin)
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
@@ -64,6 +81,25 @@ Route::middleware('auth')->group(function () {
         ->name('settings.general.update');
     Route::put('/settings/seasons-options', [SettingsController::class, 'updateSeasonOptions'])
         ->name('settings.seasons.options.update');
+    Route::put('/settings/permissions', [SettingsController::class, 'updatePermissions'])
+        ->name('settings.permissions.update');
+    Route::put('/settings/themes', [SettingsController::class, 'updateTheme'])
+        ->name('settings.themes.update');
+    Route::get('/settings/themes/{theme}/preview', [SettingsController::class, 'previewTheme'])
+        ->name('settings.themes.preview');
+    
+    // API Integrations (apenas admin)
+    Route::prefix('settings/api')->name('settings.api.')->group(function () {
+        Route::get('/', [ApiIntegrationController::class, 'index'])->name('index');
+        Route::get('/create', [ApiIntegrationController::class, 'create'])->name('create');
+        Route::post('/', [ApiIntegrationController::class, 'store'])->name('store');
+        Route::get('/{apiIntegration}/edit', [ApiIntegrationController::class, 'edit'])->name('edit');
+        Route::put('/{apiIntegration}', [ApiIntegrationController::class, 'update'])->name('update');
+        Route::delete('/{apiIntegration}', [ApiIntegrationController::class, 'destroy'])->name('destroy');
+        Route::post('/{apiIntegration}/tokens/generate', [ApiIntegrationController::class, 'generateToken'])->name('tokens.generate');
+        Route::patch('/{apiIntegration}/tokens/{apiToken}/toggle-status', [ApiIntegrationController::class, 'toggleTokenStatus'])->name('tokens.toggle-status');
+        Route::post('/{apiIntegration}/tokens/{apiToken}/regenerate', [ApiIntegrationController::class, 'regenerateToken'])->name('tokens.regenerate');
+    });
 
     // Vendas recentes para notificações
     Route::get('/scores/recent', [ScoreController::class, 'recent'])->name('scores.recent');
@@ -80,5 +116,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/score-evolution', [ScoreEvolutionController::class, 'index'])->name('score-evolution');
         Route::get('/occurrences', [OccurrencesController::class, 'index'])->name('occurrences');
         Route::get('/gamification', [GamificationController::class, 'index'])->name('gamification');
+    });
+
+    // Monitores (apenas admin)
+    Route::prefix('admin/monitors')->name('admin.monitors.')->group(function () {
+        Route::get('/', [AdminMonitorController::class, 'index'])->name('index');
+        Route::get('/create', [AdminMonitorController::class, 'create'])->name('create');
+        Route::post('/', [AdminMonitorController::class, 'store'])->name('store');
+        Route::get('/{monitor}', [AdminMonitorController::class, 'show'])->name('show');
+        Route::get('/{monitor}/edit', [AdminMonitorController::class, 'edit'])->name('edit');
+        Route::put('/{monitor}', [AdminMonitorController::class, 'update'])->name('update');
+        Route::delete('/{monitor}', [AdminMonitorController::class, 'destroy'])->name('destroy');
+        Route::patch('/{monitor}/toggle-status', [AdminMonitorController::class, 'toggleStatus'])->name('toggle-status');
     });
 });
