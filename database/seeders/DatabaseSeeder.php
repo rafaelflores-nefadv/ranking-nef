@@ -15,9 +15,6 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             ConfigSeeder::class,
             SeasonSeeder::class,
-            TeamSeeder::class,
-            SellerSeeder::class,
-            ScoreRuleSeeder::class,
         ]);
     }
 }
