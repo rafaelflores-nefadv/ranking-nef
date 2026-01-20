@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Config;
+use App\Services\PermissionService;
 use Illuminate\Database\Seeder;
 
 class ConfigSeeder extends Seeder
@@ -52,6 +53,14 @@ class ConfigSeeder extends Seeder
             [
                 'key' => 'notifications_sound_enabled',
                 'value' => 'true',
+            ],
+            [
+                'key' => 'notifications_popup_max_count',
+                'value' => '2',
+            ],
+            [
+                'key' => 'notifications_popup_auto_close_seconds',
+                'value' => '7',
             ],
             [
                 'key' => 'notifications_voice_enabled',
@@ -115,6 +124,14 @@ class ConfigSeeder extends Seeder
                         'sound' => false,
                     ],
                 ]),
+            ],
+            [
+                'key' => 'supervisor_permissions',
+                'value' => json_encode(PermissionService::getDefaultPermissions()),
+            ],
+            [
+                'key' => 'monitor_theme',
+                'value' => 'default',
             ],
         ];
 

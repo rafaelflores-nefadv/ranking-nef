@@ -3,12 +3,14 @@
 namespace App\Providers;
 
 use App\Models\Config;
+use App\Models\Goal;
 use App\Models\ScoreRule;
 use App\Models\Season;
 use App\Models\Seller;
 use App\Models\Team;
 use App\Models\User;
 use App\Policies\ConfigPolicy;
+use App\Policies\GoalPolicy;
 use App\Policies\ScoreRulePolicy;
 use App\Policies\SeasonPolicy;
 use App\Policies\SellerPolicy;
@@ -30,6 +32,7 @@ class AuthServiceProvider extends ServiceProvider
         ScoreRule::class => ScoreRulePolicy::class,
         Config::class => ConfigPolicy::class,
         User::class => UserPolicy::class,
+        Goal::class => GoalPolicy::class,
     ];
 
     /**

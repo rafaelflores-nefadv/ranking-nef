@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Seller;
 use App\Models\User;
+use App\Services\PermissionService;
 
 class SellerPolicy
 {
@@ -12,8 +13,22 @@ class SellerPolicy
      */
     public function viewAny(User $user): bool
     {
-        // admin, supervisor e user podem ver
-        return in_array($user->role, ['admin', 'supervisor', 'user']);
+        // user pode ver (sem mudança)
+        if ($user->role === 'user') {
+            return true;
+        }
+
+        // Admin sempre pode ver
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        // Supervisor: verificar permissão configurável
+        if ($user->role === 'supervisor') {
+            return PermissionService::can($user, 'sellers', 'view');
+        }
+
+        return false;
     }
 
     /**
@@ -45,8 +60,17 @@ class SellerPolicy
      */
     public function create(User $user): bool
     {
-        // Apenas admin pode criar
-        return $user->role === 'admin';
+        // Admin sempre pode criar
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        // Supervisor: verificar permissão configurável
+        if ($user->role === 'supervisor') {
+            return PermissionService::can($user, 'sellers', 'create');
+        }
+
+        return false;
     }
 
     /**
@@ -54,13 +78,18 @@ class SellerPolicy
      */
     public function update(User $user, Seller $seller): bool
     {
-        // admin pode editar todos
+        // Admin sempre pode editar
         if ($user->role === 'admin') {
             return true;
         }
         
-        // supervisor só pode editar vendedores das suas equipes
+        // Supervisor: verificar permissão configurável e se o vendedor está nas suas equipes
         if ($user->role === 'supervisor') {
+            if (!PermissionService::can($user, 'sellers', 'edit')) {
+                return false;
+            }
+            
+            // Verificar se o vendedor pertence a uma equipe do supervisor
             $allowedTeamIds = $user->getSupervisedTeamIds();
             return in_array($seller->team_id, $allowedTeamIds);
         }
@@ -73,7 +102,22 @@ class SellerPolicy
      */
     public function delete(User $user, Seller $seller): bool
     {
-        // Apenas admin pode deletar
-        return $user->role === 'admin';
+        // Admin sempre pode deletar
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        // Supervisor: verificar permissão configurável e se o vendedor está nas suas equipes
+        if ($user->role === 'supervisor') {
+            if (!PermissionService::can($user, 'sellers', 'delete')) {
+                return false;
+            }
+            
+            // Verificar se o vendedor pertence a uma equipe do supervisor
+            $allowedTeamIds = $user->getSupervisedTeamIds();
+            return in_array($seller->team_id, $allowedTeamIds);
+        }
+
+        return false;
     }
 }

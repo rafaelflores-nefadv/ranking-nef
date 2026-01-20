@@ -1,4 +1,4 @@
-<div class="bg-slate-900/40 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50 max-h-[600px] overflow-y-auto">
+<div class="bg-slate-900/40 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50 max-h-[600px] overflow-y-auto custom-scrollbar">
     <h3 class="text-white font-semibold mb-4 text-sm">
         Classificação {{ $activeTeam ? $activeTeam->name : 'Geral' }}
     </h3>

@@ -1,14 +1,12 @@
-@extends('layouts.app')
+@extends('monitors.themes.default.layout')
 
 @php
     $saleTerm = $configs['sale_term'] ?? 'Venda';
     $saleTermLower = strtolower($saleTerm);
 @endphp
 
-@section('title', "Dashboard - Ranking de {$saleTermLower}")
-
 @section('content')
-<div class="min-h-screen bg-[#0a0e1a] relative overflow-hidden">
+<div class="w-full h-full bg-[#0a0e1a] relative overflow-hidden">
     <!-- Background animado -->
     <div class="fixed inset-0 pointer-events-none">
         <div class="absolute inset-0 bg-gradient-to-br from-blue-950/20 via-slate-950 to-purple-950/20"></div>
@@ -39,7 +37,7 @@
                         <polyline points="16 7 22 7 22 13"></polyline>
                     </svg>
                     <span class="text-slate-400 text-sm">Porcentagem do time:</span>
-                    <span id="team-percentage" class="text-green-400 font-bold">{{ number_format((($stats['totalPoints'] ?? 0) / 500000) * 100, 2) }}%</span>
+                    <span id="team-percentage" class="text-green-400 font-bold">{{ number_format($percentage ?? 0, 2) }}%</span>
                 </div>
             </div>
 
@@ -62,13 +60,6 @@
                     <span class="text-slate-400 text-sm">Usuários:</span>
                     <span class="text-purple-400 font-bold">(<span id="active-participants">{{ $stats['activeParticipants'] ?? 0 }}</span>/<span id="total-participants-inline">{{ $stats['totalParticipants'] ?? 0 }}</span>)</span>
                 </div>
-                
-                <a href="{{ route('settings') }}" class="p-2 hover:bg-slate-800 rounded-lg transition-colors hidden">
-                    <svg class="w-5 h-5 text-slate-400 hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                </a>
             </div>
         </div>
     </div>
@@ -101,11 +92,11 @@
                 </div>
                 <div id="team-chips" class="hidden lg:flex items-center gap-2">
                     <span class="text-xs text-slate-500">Equipes:</span>
-                    <a data-team-id="" href="{{ route('dashboard') }}" class="px-2 py-1 rounded-full text-xs border {{ !$activeTeam ? 'border-blue-500 text-blue-300' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500' }}">
+                    <a data-team-id="" href="javascript:void(0)" class="px-2 py-1 rounded-full text-xs border {{ !$activeTeam ? 'border-blue-500 text-blue-300' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500' }}">
                         Geral
                     </a>
                     @foreach($teams as $team)
-                        <a data-team-id="{{ $team->id }}" href="{{ route('dashboard', ['team' => $team->id]) }}" class="px-2 py-1 rounded-full text-xs border {{ $activeTeam && $activeTeam->id === $team->id ? 'border-blue-500 text-blue-300' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500' }}">
+                        <a data-team-id="{{ $team->id }}" href="javascript:void(0)" class="px-2 py-1 rounded-full text-xs border {{ $activeTeam && $activeTeam->id === $team->id ? 'border-blue-500 text-blue-300' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500' }}">
                             {{ $team->name }}
                         </a>
                     @endforeach
@@ -120,6 +111,12 @@
                     <svg id="sound-icon-off" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                    </svg>
+                </button>
+                
+                <button id="read-voice-btn" class="p-2 bg-slate-800/50 border border-slate-700 text-white rounded-lg hover:bg-slate-700 transition-colors" title="Ler ranking por voz">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                     </svg>
                 </button>
             </div>
@@ -140,57 +137,7 @@
             </div>
 
             <!-- Controles Direita -->
-            <div class="col-span-3 flex flex-col gap-4">
-                <!-- Metas Ativas -->
-                @if(isset($activeGoals) && $activeGoals->count() > 0)
-                <div class="bg-slate-900/60 backdrop-blur-sm rounded-xl border border-slate-700/50 p-4">
-                    <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Metas Ativas
-                    </h3>
-                    <div class="space-y-3 max-h-[400px] overflow-y-auto">
-                        @foreach($activeGoals as $goal)
-                        <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/30">
-                            <div class="flex items-start justify-between mb-2">
-                                <h4 class="text-sm font-medium text-white">{{ $goal->name }}</h4>
-                                <span class="px-2 py-0.5 text-xs rounded-full
-                                    @if($goal->scope === 'global') bg-purple-600/20 text-purple-400
-                                    @elseif($goal->scope === 'team') bg-blue-600/20 text-blue-400
-                                    @else bg-green-600/20 text-green-400
-                                    @endif">
-                                    {{ ucfirst($goal->scope) }}
-                                </span>
-                            </div>
-                            <div class="mb-2">
-                                <div class="flex items-center justify-between text-xs mb-1">
-                                    <span class="text-slate-400">Progresso</span>
-                                    <span class="text-white font-semibold">{{ number_format($goal->progress_data['progress'], 1) }}%</span>
-                                </div>
-                                <div class="w-full bg-slate-700 rounded-full h-1.5">
-                                    <div class="h-1.5 rounded-full transition-all
-                                        @if($goal->progress_data['progress'] >= 100) bg-green-500
-                                        @elseif($goal->progress_data['progress'] >= 50) bg-yellow-500
-                                        @else bg-blue-500
-                                        @endif"
-                                        style="width: {{ min(100, $goal->progress_data['progress']) }}%">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="text-xs text-slate-500">
-                                {{ number_format($goal->progress_data['current_value'], 0, ',', '.') }} / {{ number_format($goal->target_value, 0, ',', '.') }} pontos
-                            </div>
-                        </div>
-                        @endforeach
-                    </div>
-                    <a href="{{ route('goals.index') }}" class="mt-3 block text-center text-sm text-blue-400 hover:text-blue-300">
-                        Ver todas as metas →
-                    </a>
-                </div>
-                @endif
-                
-                <!-- Controles de Atualização -->
+            <div class="col-span-3 flex items-center justify-center">
                 <div class="flex flex-col items-center gap-4">
                     <!-- Time selector buttons -->
                     <div class="flex flex-col gap-2">
@@ -239,6 +186,15 @@
 
 @push('scripts')
 <script>
+    // Configuração do monitor vindo de window.DASHBOARD_CONFIG
+    const config = window.DASHBOARD_CONFIG || {};
+    // Pegar slug do monitor da URL ou da config
+    const monitorSlug = config.monitor_slug || @json($monitor->slug ?? '') || window.location.pathname.match(/\/monitor\/([^\/]+)/)?.[1] || '';
+    
+    if (!monitorSlug) {
+        console.error('Monitor: slug não encontrado!', { config, pathname: window.location.pathname });
+    }
+    
     // Atualizar relógio a cada segundo
     function updateTime() {
         const now = new Date();
@@ -253,78 +209,49 @@
     setInterval(updateTime, 1000);
     updateTime();
 
-    // Auto refresh do ranking (recarrega a página)
-    const refreshButtons = Array.from(document.querySelectorAll('[data-refresh-interval]'));
-    const toggleButton = document.getElementById('toggle-refresh');
-    const countdownElement = document.getElementById('refresh-countdown');
-    const ACTIVE_CLASSES = 'bg-blue-600 text-white shadow-lg shadow-blue-500/50';
-    const INACTIVE_CLASSES = 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50';
-    const STORAGE_KEY = 'ranking_refresh_interval';
-    const PAUSED_KEY = 'ranking_refresh_paused';
+    // Configurações do monitor
+    const refreshInterval = config.refresh_interval || 30000;
+    const autoRotateTeams = config.auto_rotate_teams !== false;
+    const allowedTeams = config.teams || [];
+    // notificationsEnabled será definido mais abaixo (igual ao dashboard - usa apenas notifications_system_enabled)
+    // soundEnabled será definido mais abaixo com localStorage
 
-    let refreshTimer = null;
-    let countdownTimer = null;
-    let remainingMs = 0;
-    let selectedInterval = Number(localStorage.getItem(STORAGE_KEY)) || 30000;
-    let isPaused = localStorage.getItem(PAUSED_KEY) === 'true';
-
-    const setButtonState = (button, isActive) => {
-        const classes = button.className.split(' ').filter(Boolean);
-        const cleaned = classes
-            .filter((cls) => !ACTIVE_CLASSES.split(' ').includes(cls))
-            .filter((cls) => !INACTIVE_CLASSES.split(' ').includes(cls));
-        button.className = `${cleaned.join(' ')} ${isActive ? ACTIVE_CLASSES : INACTIVE_CLASSES}`.trim();
-    };
-
-    const updateActiveButton = () => {
-        refreshButtons.forEach((button) => {
-            const interval = Number(button.dataset.refreshInterval || 0);
-            setButtonState(button, interval === selectedInterval);
-        });
-    };
-
-    const updateToggleIcon = () => {
-        if (!toggleButton) return;
-        toggleButton.innerHTML = isPaused
-            ? '<svg class="w-5 h-5 text-white fill-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>'
-            : '<svg class="w-5 h-5 text-white fill-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></svg>';
-    };
-
-    const updateCountdownLabel = () => {
-        if (!countdownElement) return;
-        if (isPaused) {
-            countdownElement.textContent = 'Pausado';
-            return;
-        }
-        const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
-        countdownElement.textContent = `Atualiza em ${remainingSeconds}s`;
-    };
-
+    // Dados iniciais
     const teamsRotation = @json($teams->values()->map(fn($team) => ['id' => $team->id])->all());
-    const teamIdsRotation = [null, ...teamsRotation.map((team) => team.id)];
+    let teamIdsRotation = [null];
+    
+    // Filtrar equipes se houver configuração
+    if (allowedTeams.length > 0) {
+        // Filtrar apenas equipes permitidas e que existem
+        const validAllowedTeams = allowedTeams.filter(id => teamsRotation.some(t => t.id === id));
+        teamIdsRotation = [null, ...validAllowedTeams];
+    } else {
+        // Se não há equipes especificadas, usar todas
+        teamIdsRotation = [null, ...teamsRotation.map((team) => team.id)];
+    }
+    
+    console.log('Monitor: Configuração de rotação de equipes', {
+        allowedTeams,
+        teamsRotation: teamsRotation.map(t => t.id),
+        teamIdsRotation,
+        autoRotateTeams
+    });
+    
     let currentTeamId = @json($activeTeam?->id);
+    
+    // Garantir que currentTeamId inicial está na rotação (se não estiver, usar null/Geral)
+    if (currentTeamId && !teamIdsRotation.includes(currentTeamId)) {
+        console.log('Monitor: Equipe atual não está na rotação, resetando para Geral', { currentTeamId, teamIdsRotation });
+        currentTeamId = null;
+    }
 
     const rankingSidebar = document.getElementById('ranking-sidebar');
     const podiumArea = document.getElementById('podium-area');
     const teamNameSpan = document.getElementById('ranking-team-name');
-    const teamChips = document.getElementById('team-chips');
     const totalParticipantsEl = document.getElementById('total-participants');
     const totalParticipantsInlineEl = document.getElementById('total-participants-inline');
     const activeParticipantsEl = document.getElementById('active-participants');
     const teamPercentageEl = document.getElementById('team-percentage');
-
-    const updateTeamChips = () => {
-        if (!teamChips) return;
-        const chips = Array.from(teamChips.querySelectorAll('[data-team-id]'));
-        chips.forEach((chip) => {
-            const chipTeamId = chip.dataset.teamId || null;
-            const isActive = (chipTeamId || null) === (currentTeamId || null);
-            chip.classList.toggle('border-blue-500', isActive);
-            chip.classList.toggle('text-blue-300', isActive);
-            chip.classList.toggle('border-slate-700', !isActive);
-            chip.classList.toggle('text-slate-400', !isActive);
-        });
-    };
 
     const updateHeaderTeamName = (teamName) => {
         if (!teamNameSpan) return;
@@ -363,7 +290,7 @@
     };
 
     const fetchDashboardData = async () => {
-        const url = new URL('/dashboard/data', window.location.origin);
+        const url = new URL(`/monitor/${monitorSlug}/data`, window.location.origin);
         if (currentTeamId) {
             url.searchParams.set('team', currentTeamId);
         }
@@ -397,16 +324,114 @@
             updateHeaderTeamName(data.activeTeamName || '');
             updateStats(data.stats || {});
         } catch (error) {
-            console.error('Erro ao atualizar dashboard:', error);
+            console.error('Erro ao atualizar monitor:', error);
         }
     };
 
+    // Auto refresh do ranking
+    const refreshButtons = Array.from(document.querySelectorAll('[data-refresh-interval]'));
+    const toggleButton = document.getElementById('toggle-refresh');
+    const countdownElement = document.getElementById('refresh-countdown');
+    const ACTIVE_CLASSES = 'bg-blue-600 text-white shadow-lg shadow-blue-500/50';
+    const INACTIVE_CLASSES = 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50';
+    const STORAGE_KEY = `monitor_${monitorSlug}_refresh_interval`;
+    const PAUSED_KEY = `monitor_${monitorSlug}_refresh_paused`;
+
+    let refreshTimer = null;
+    let countdownTimer = null;
+    let remainingMs = 0;
+    // Sempre usar a configuração do monitor ao recarregar (não usar localStorage)
+    let selectedInterval = refreshInterval;
+    let isPaused = false; // Sempre começar ativo ao recarregar
+
+    const setButtonState = (button, isActive) => {
+        const classes = button.className.split(' ').filter(Boolean);
+        const cleaned = classes
+            .filter((cls) => !ACTIVE_CLASSES.split(' ').includes(cls))
+            .filter((cls) => !INACTIVE_CLASSES.split(' ').includes(cls));
+        button.className = `${cleaned.join(' ')} ${isActive ? ACTIVE_CLASSES : INACTIVE_CLASSES}`.trim();
+    };
+
+    const updateActiveButton = () => {
+        refreshButtons.forEach((button) => {
+            const interval = Number(button.dataset.refreshInterval || 0);
+            setButtonState(button, interval === selectedInterval);
+        });
+    };
+
+    const updateToggleIcon = () => {
+        if (!toggleButton) return;
+        toggleButton.innerHTML = isPaused
+            ? '<svg class="w-5 h-5 text-white fill-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>'
+            : '<svg class="w-5 h-5 text-white fill-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></svg>';
+    };
+
+    const updateCountdownLabel = () => {
+        if (!countdownElement) return;
+        if (isPaused) {
+            countdownElement.textContent = 'Pausado';
+            return;
+        }
+        const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+        countdownElement.textContent = `Atualiza em ${remainingSeconds}s`;
+    };
+
+    const teamChips = document.getElementById('team-chips');
+
+    const updateTeamChips = () => {
+        if (!teamChips) return;
+        const chips = Array.from(teamChips.querySelectorAll('[data-team-id]'));
+        chips.forEach((chip) => {
+            const chipTeamId = chip.dataset.teamId || null;
+            const isActive = (chipTeamId || null) === (currentTeamId || null);
+            chip.classList.toggle('border-blue-500', isActive);
+            chip.classList.toggle('text-blue-300', isActive);
+            chip.classList.toggle('border-slate-700', !isActive);
+            chip.classList.toggle('text-slate-400', !isActive);
+        });
+    };
+
     const rotateTeamAndRefresh = () => {
+        if (!autoRotateTeams) {
+            updateTeamChips();
+            fetchDashboardData();
+            return;
+        }
+        
+        // Garantir que teamIdsRotation tem valores válidos
+        if (teamIdsRotation.length === 0) {
+            teamIdsRotation = [null];
+        }
+        
         const currentIndex = teamIdsRotation.indexOf(currentTeamId ?? null);
-        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % teamIdsRotation.length : 0;
+        let nextIndex;
+        
+        if (currentIndex >= 0) {
+            // Se encontrou, vai para a próxima
+            nextIndex = (currentIndex + 1) % teamIdsRotation.length;
+        } else {
+            // Se não encontrou (por exemplo, equipe foi removida), começa do início
+            nextIndex = 0;
+        }
+        
         currentTeamId = teamIdsRotation[nextIndex];
+        
+        console.log('Monitor: Rotacionando equipe', {
+            currentIndex,
+            nextIndex,
+            currentTeamId: currentTeamId || 'Geral',
+            teamIdsRotation,
+            totalEquipes: teamIdsRotation.length
+        });
+        
         updateTeamChips();
         fetchDashboardData();
+        
+        // Resetar o countdown após a rotação
+        if (!isPaused && countdownTimer) {
+            remainingMs = selectedInterval;
+            updateCountdownLabel();
+        }
     };
 
     const startAutoRefresh = () => {
@@ -435,7 +460,7 @@
             const interval = Number(button.dataset.refreshInterval || 0);
             if (!interval) return;
             selectedInterval = interval;
-            localStorage.setItem(STORAGE_KEY, String(selectedInterval));
+            // Não salvar no localStorage - usar apenas durante a sessão
             updateActiveButton();
             startAutoRefresh();
         });
@@ -444,7 +469,7 @@
     if (toggleButton) {
         toggleButton.addEventListener('click', () => {
             isPaused = !isPaused;
-            localStorage.setItem(PAUSED_KEY, String(isPaused));
+            // Não salvar no localStorage - usar apenas durante a sessão
             updateToggleIcon();
             startAutoRefresh();
         });
@@ -458,26 +483,38 @@
                 currentTeamId = chip.dataset.teamId || null;
                 updateTeamChips();
                 fetchDashboardData();
+                // Resetar o countdown ao trocar de equipe manualmente
+                remainingMs = selectedInterval;
+                updateCountdownLabel();
             });
         });
     }
 
     updateActiveButton();
     updateToggleIcon();
+    updateTeamChips();
     startAutoRefresh();
 
     // Notificações de vendas em tempo real (polling)
-    const notificationsEnabled = @json((($configs['notifications_system_enabled'] ?? 'true') === 'true'));
-    const SOUND_STORAGE_KEY = 'dashboard_sound_enabled';
-    let soundEnabled = localStorage.getItem(SOUND_STORAGE_KEY);
-    if (soundEnabled === null) {
-        soundEnabled = @json((($configs['notifications_sound_enabled'] ?? 'true') === 'true'));
-        localStorage.setItem(SOUND_STORAGE_KEY, soundEnabled);
-    } else {
-        soundEnabled = soundEnabled === 'true';
-    }
+    // Verificar configuração do monitor primeiro, depois do sistema
+    const monitorNotificationsEnabled = config.notifications_enabled === true || config.notifications_enabled === 'true' || config.notifications_enabled === 1;
+    const systemNotificationsEnabled = @json((($configs['notifications_system_enabled'] ?? 'true') === 'true'));
+    // Notificações do monitor têm prioridade, mas devem estar habilitadas no sistema também
+    const notificationsEnabled = monitorNotificationsEnabled && systemNotificationsEnabled;
+    
+    // Som: usar configuração do monitor ao recarregar (não usar localStorage)
+    const monitorSoundEnabled = config.sound_enabled === true || config.sound_enabled === 'true' || config.sound_enabled === 1;
+    const systemSoundEnabled = @json((($configs['notifications_sound_enabled'] ?? 'true') === 'true'));
+    // Som do monitor tem prioridade se configurado, senão usa do sistema
+    let soundEnabled = (config.sound_enabled !== undefined && config.sound_enabled !== null) ? monitorSoundEnabled : systemSoundEnabled;
+    
+    console.log('Monitor: Configurações de notificações', {
+        notificationsEnabled,
+        soundEnabled,
+        config: config
+    });
     const notificationsContainer = document.getElementById('sale-notifications');
-    const SALES_STORAGE_KEY = 'ranking_sales_last_timestamp';
+    const SALES_STORAGE_KEY = `monitor_${monitorSlug}_sales_last_timestamp`;
     const SALES_POLLING_INTERVAL = 4000;
 
     // Configurações de sons
@@ -505,14 +542,7 @@
     const saleTermLower = @json($saleTermLower);
 
     const toastQueue = [];
-    const MAX_VISIBLE_TOASTS = parseInt(@json($configs['notifications_popup_max_count'] ?? '2'), 10);
-    const AUTO_CLOSE_SECONDS = parseInt(@json($configs['notifications_popup_auto_close_seconds'] ?? '7'), 10) * 1000;
-    
-    // Debug: verificar configurações carregadas
-    console.log('Configurações de notificações:', {
-        maxVisibleToasts: MAX_VISIBLE_TOASTS,
-        autoCloseSeconds: AUTO_CLOSE_SECONDS / 1000
-    });
+    const MAX_VISIBLE_TOASTS = 2;
 
     const getVisibleToasts = () => {
         if (!notificationsContainer) return [];
@@ -553,15 +583,20 @@
         notificationsContainer.appendChild(toast);
 
         // Tocar som quando a notificação é exibida na tela
-        playNotificationSound('sale_registered');
+        // Usar requestAnimationFrame para garantir que o DOM foi atualizado antes de tocar o som
+        requestAnimationFrame(() => {
+            playNotificationSound('sale_registered');
+        });
 
         setTimeout(() => {
             if (toast.isConnected) {
                 toast.remove();
-                // Mostrar próximo toast da fila quando este fechar
                 showNextToast();
             }
-        }, AUTO_CLOSE_SECONDS);
+        }, 7000);
+
+        // Tenta preencher o segundo slot imediatamente
+        showNextToast();
     };
 
     // AudioContext global para evitar problemas de autoplay
@@ -631,6 +666,14 @@
             return;
         }
 
+        // Garantir que o AudioContext está inicializado antes de tocar
+        try {
+            getAudioContext();
+        } catch (error) {
+            console.error('Monitor: Erro ao inicializar AudioContext:', error);
+            return;
+        }
+
         // Obter o tipo de som configurado
         const soundType = soundsConfig[eventKey] || 'notification';
         
@@ -652,7 +695,10 @@
     };
 
     const fetchRecentSales = async () => {
-        if (!notificationsEnabled) return;
+        if (!notificationsEnabled) {
+            console.log('Monitor: Notificações desabilitadas', { notificationsEnabled });
+            return;
+        }
 
         const params = new URLSearchParams();
         if (lastSaleTimestamp) {
@@ -661,16 +707,22 @@
         params.append('limit', '20');
 
         try {
-            const response = await fetch(`/scores/recent?${params.toString()}`, {
+            const url = `/scores/recent?${params.toString()}`;
+            console.log('Monitor: Buscando vendas recentes', { url, lastSaleTimestamp });
+            
+            const response = await fetch(url, {
                 headers: { 'Accept': 'application/json' },
             });
 
             if (!response.ok) {
+                console.error('Monitor: Erro na resposta', { status: response.status, statusText: response.statusText });
                 return;
             }
 
             const result = await response.json();
             const sales = result?.data || [];
+            
+            console.log('Monitor: Vendas recebidas', { count: sales.length, sales });
 
             if (sales.length > 0) {
                 sales.forEach(createSaleToast);
@@ -681,7 +733,7 @@
                 }
             }
         } catch (error) {
-            console.error('Erro ao buscar vendas recentes:', error);
+            console.error('Monitor: Erro ao buscar vendas recentes:', error);
         }
     };
 
@@ -731,21 +783,296 @@
     if (toggleSoundBtn) {
         toggleSoundBtn.addEventListener('click', () => {
             soundEnabled = !soundEnabled;
-            localStorage.setItem(SOUND_STORAGE_KEY, soundEnabled);
+            // Não salvar no localStorage - manter apenas durante a sessão
+            // Ao recarregar, volta para a configuração do monitor
             updateSoundButton();
         });
         updateSoundButton();
     }
 
+    // Botão de leitura por voz manual
+    const readVoiceBtn = document.getElementById('read-voice-btn');
+    
+    // Variável global para controlar se está falando (compartilhada entre leituras automáticas e manuais)
+    window.isSpeaking = false;
+    
+    // Função para atualizar estado do botão (tornar global para leituras automáticas)
+    window.updateVoiceButtonState = (isSpeaking) => {
+        if (!readVoiceBtn) return;
+        window.isSpeaking = isSpeaking;
+        readVoiceBtn.disabled = isSpeaking;
+        readVoiceBtn.classList.toggle('opacity-50', isSpeaking);
+        readVoiceBtn.classList.toggle('cursor-not-allowed', isSpeaking);
+        readVoiceBtn.classList.toggle('hover:bg-slate-700', !isSpeaking);
+        readVoiceBtn.setAttribute('title', isSpeaking ? 'Leitura em andamento...' : 'Ler ranking por voz');
+    };
+    
+    if (readVoiceBtn) {
+        // Configurações de voz do sistema (disponíveis no PHP)
+        const browserVoiceName = @json(App\Models\Config::where('key', 'notifications_voice_browser_name')->value('value') ?? '');
+        const systemVoiceEnabled = @json((App\Models\Config::where('key', 'notifications_voice_enabled')->value('value') ?? 'false') === 'true');
+        const voiceMode = @json(App\Models\Config::where('key', 'notifications_voice_mode')->value('value') ?? 'server');
+        
+        readVoiceBtn.addEventListener('click', async () => {
+            // Verificar se já está falando
+            if (window.isSpeaking) {
+                return;
+            }
+            // Verificar se voz está habilitada - aceitar boolean, string "true", ou número 1
+            const config = window.DASHBOARD_CONFIG || {};
+            // Converter qualquer valor para boolean explícito
+            const rawVoiceEnabled = config.voice_enabled;
+            const monitorVoiceEnabled = rawVoiceEnabled === true || 
+                                       rawVoiceEnabled === 'true' || 
+                                       rawVoiceEnabled === 1 ||
+                                       rawVoiceEnabled === '1';
+            
+            console.log('Monitor: Verificando voz', {
+                config: config,
+                voice_enabled_raw: rawVoiceEnabled,
+                voice_enabled_type: typeof rawVoiceEnabled,
+                monitorVoiceEnabled,
+                systemVoiceEnabled,
+                voiceMode,
+                canUseVoice: monitorVoiceEnabled && systemVoiceEnabled && ['browser', 'both'].includes(voiceMode)
+            });
+            
+            // Verificações específicas para mensagens de erro claras
+            if (!monitorVoiceEnabled) {
+                showCustomAlert(
+                    'Voz não habilitada no Monitor',
+                    'A leitura por voz não está habilitada para este monitor. Para habilitar, edite o monitor e marque a opção "Leitura por voz habilitada".',
+                    'warning'
+                );
+                return;
+            }
+            
+            if (!systemVoiceEnabled) {
+                showCustomAlert(
+                    'Voz não habilitada no Sistema',
+                    'A leitura por voz não está habilitada nas configurações gerais do sistema. Para habilitar, vá em Configurações > Notificações > Leitura por Voz e marque "Ativar leitura por voz".',
+                    'warning'
+                );
+                return;
+            }
+            
+            if (!['browser', 'both'].includes(voiceMode)) {
+                showCustomAlert(
+                    'Modo de Voz Incompatível',
+                    'O modo de voz do sistema está configurado como "Servidor" apenas, o que não permite leitura no navegador. Para usar a leitura no monitor, configure o modo de voz como "Navegador" ou "Servidor + Navegador" nas configurações gerais.',
+                    'warning'
+                );
+                return;
+            }
+
+            if (!('speechSynthesis' in window)) {
+                alert('Seu navegador não suporta leitura por voz (SpeechSynthesis).');
+                return;
+            }
+            
+            // Desabilitar botão imediatamente ao iniciar
+            updateVoiceButtonState(true);
+
+            // Função para obter voz configurada
+            const getVoice = () => {
+                if (!browserVoiceName) return null;
+                const voices = window.speechSynthesis.getVoices();
+                return voices.find(v => v.name === browserVoiceName) || null;
+            };
+
+            // Função para reproduzir texto
+            const speakText = (text) => {
+                return new Promise((resolve) => {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    const voice = getVoice();
+                    
+                    if (voice) {
+                        utterance.voice = voice;
+                    }
+
+                    utterance.onend = () => {
+                        resolve();
+                    };
+                    utterance.onerror = () => {
+                        resolve();
+                    };
+
+                    // Desabilitar botão ao começar a falar
+                    updateVoiceButtonState(true);
+                    
+                    window.speechSynthesis.speak(utterance);
+                });
+            };
+
+            // Buscar notificações de voz recentes
+            try {
+                const voiceResponse = await fetch('/notifications/voice/recent?limit=10');
+                if (!voiceResponse.ok) {
+                    console.error('Monitor: Erro ao buscar leitura por voz');
+                    alert('Erro ao buscar leituras de voz disponíveis.');
+                    return;
+                }
+
+                const voiceResult = await voiceResponse.json();
+                const items = voiceResult?.data || [];
+
+                if (items.length === 0) {
+                    // Se não houver notificações salvas, gerar leitura atual do ranking
+                    console.log('Monitor: Nenhuma notificação de voz encontrada, gerando leitura atual...');
+                    
+                    try {
+                        // Buscar leitura do ranking geral e todas as equipes (não apenas a selecionada)
+                        const voiceTextResponse = await fetch(`/monitor/${monitorSlug}/voice`, {
+                            headers: { 'Accept': 'application/json' },
+                        });
+                        
+                        if (!voiceTextResponse.ok) {
+                            const errorData = await voiceTextResponse.json().catch(() => ({}));
+                            updateVoiceButtonState(false);
+                            showCustomAlert(
+                                'Erro ao gerar leitura',
+                                errorData.error || 'Não foi possível gerar a leitura do ranking. Tente novamente.',
+                                'error'
+                            );
+                            return;
+                        }
+                        
+                        const voiceTextResult = await voiceTextResponse.json();
+                        
+                        if (voiceTextResult?.content) {
+                            // Garantir que as vozes estejam carregadas
+                            if (window.speechSynthesis.getVoices().length === 0) {
+                                window.speechSynthesis.addEventListener('voiceschanged', async () => {
+                                    await speakText(voiceTextResult.content);
+                                    updateVoiceButtonState(false);
+                                }, { once: true });
+                            } else {
+                                await speakText(voiceTextResult.content);
+                                updateVoiceButtonState(false);
+                            }
+                        } else {
+                            updateVoiceButtonState(false);
+                            showCustomAlert(
+                                'Erro ao gerar leitura',
+                                'Não foi possível gerar o texto do ranking.',
+                                'error'
+                            );
+                        }
+                    } catch (error) {
+                        console.error('Monitor: Erro ao gerar leitura por voz:', error);
+                        updateVoiceButtonState(false);
+                        showCustomAlert(
+                            'Erro ao gerar leitura',
+                            'Ocorreu um erro ao tentar gerar a leitura do ranking. Verifique o console para mais detalhes.',
+                            'error'
+                        );
+                    }
+                    return;
+                }
+
+                // Garantir que as vozes estejam carregadas
+                if (window.speechSynthesis.getVoices().length === 0) {
+                    window.speechSynthesis.addEventListener('voiceschanged', async () => {
+                        await speakAllVoiceItems(items);
+                    }, { once: true });
+                } else {
+                    await speakAllVoiceItems(items);
+                }
+
+                async function speakAllVoiceItems(itemsToSpeak) {
+                    try {
+                        // Ordenar do mais antigo para o mais recente (primeiro a ser lido)
+                        const ordered = itemsToSpeak.slice().reverse();
+                        
+                        for (const item of ordered) {
+                            if (item?.content) {
+                                await speakText(item.content);
+                            }
+                        }
+                    } finally {
+                        // Reabilitar botão ao terminar
+                        updateVoiceButtonState(false);
+                    }
+                }
+            } catch (error) {
+                console.error('Monitor: Erro ao executar leitura por voz:', error);
+                alert('Erro ao executar leitura por voz. Verifique o console para mais detalhes.');
+            }
+        });
+    }
+
+    // Controle de polling de notificações com detecção de visibilidade
+    let salesPollingInterval = null;
+    
+    const startSalesPolling = () => {
+        if (salesPollingInterval) {
+            clearInterval(salesPollingInterval);
+        }
+        if (notificationsEnabled && document.visibilityState === 'visible') {
+            fetchRecentSales();
+            salesPollingInterval = setInterval(() => {
+                // Só buscar se a página estiver visível
+                if (document.visibilityState === 'visible') {
+                    fetchRecentSales();
+                }
+            }, SALES_POLLING_INTERVAL);
+        }
+    };
+    
+    const stopSalesPolling = () => {
+        if (salesPollingInterval) {
+            clearInterval(salesPollingInterval);
+            salesPollingInterval = null;
+        }
+    };
+    
+    // Detectar mudanças de visibilidade da página
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            // Quando a página volta a ficar visível, atualizar o timestamp
+            // para evitar processar notificações antigas acumuladas
+            lastSaleTimestamp = new Date(Date.now() - 5000).toISOString();
+            localStorage.setItem(SALES_STORAGE_KEY, lastSaleTimestamp);
+            console.log('Monitor: Página voltou a ficar visível, timestamp atualizado para evitar acúmulo de notificações');
+            startSalesPolling();
+        } else {
+            // Quando a página perde o foco, pausar o polling
+            console.log('Monitor: Página perdeu o foco, pausando polling de notificações');
+            stopSalesPolling();
+        }
+    });
+    
     if (notificationsEnabled) {
-        fetchRecentSales();
-        setInterval(fetchRecentSales, SALES_POLLING_INTERVAL);
+        startSalesPolling();
     }
 </script>
 @endpush
 
 @push('styles')
 <style>
+    /* Custom scrollbar */
+    .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(148, 163, 184, 0.3);
+        border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(148, 163, 184, 0.5);
+    }
+
     .podium-card {
         animation: podium-float 5s ease-in-out infinite;
         transform-origin: center;
@@ -780,7 +1107,6 @@
     .fade-transition.fade-active {
         transition: opacity 300ms ease, transform 300ms ease;
     }
-
 
     @keyframes podium-float {
         0%, 100% {

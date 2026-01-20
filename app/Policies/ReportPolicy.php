@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\User;
+use App\Services\PermissionService;
 
 class ReportPolicy
 {
@@ -11,8 +12,22 @@ class ReportPolicy
      */
     public function viewAny(User $user): bool
     {
-        // Admin, supervisor e user podem ver relatórios
-        return in_array($user->role, ['admin', 'supervisor', 'user']);
+        // user pode ver (sem mudança)
+        if ($user->role === 'user') {
+            return true;
+        }
+
+        // Admin sempre pode ver
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        // Supervisor: verificar permissão configurável
+        if ($user->role === 'supervisor') {
+            return PermissionService::can($user, 'reports', 'view');
+        }
+
+        return false;
     }
 
     /**

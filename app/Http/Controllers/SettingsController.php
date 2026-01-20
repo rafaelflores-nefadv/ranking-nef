@@ -8,6 +8,7 @@ use App\Models\Season;
 use App\Models\ScoreRule;
 use App\Models\Seller;
 use App\Models\Team;
+use App\Services\PermissionService;
 use Illuminate\Http\Request;
 
 class SettingsController extends Controller
@@ -40,6 +41,11 @@ class SettingsController extends Controller
         $seasons = Season::all();
         $scoreRules = ScoreRule::orderBy('priority')->orderBy('ocorrencia')->get();
 
+        // Carregar permissões do supervisor
+        $supervisorPermissions = PermissionService::getSupervisorPermissions();
+        $availableModules = PermissionService::getAvailableModules();
+        $availableActions = PermissionService::getAvailableActions();
+
         // Carregar sons personalizados com URLs completas
         $customSoundsPaths = json_decode($configs['notifications_custom_sounds'] ?? '{}', true) ?: [];
         $customSounds = [];
@@ -54,7 +60,10 @@ class SettingsController extends Controller
             'notificationEventsConfig',
             'notificationEventsLabels',
             'notificationChannelsLabels',
-            'customSounds'
+            'customSounds',
+            'supervisorPermissions',
+            'availableModules',
+            'availableActions'
         ));
     }
 
@@ -70,6 +79,8 @@ class SettingsController extends Controller
             'notifications_system_enabled' => 'nullable|boolean',
             'notifications_email_enabled' => 'nullable|boolean',
             'notifications_sound_enabled' => 'nullable|boolean',
+            'notifications_popup_max_count' => 'nullable|integer|min:1|max:10',
+            'notifications_popup_auto_close_seconds' => 'nullable|integer|min:1|max:60',
         ]);
 
         $notificationKeys = [
@@ -84,6 +95,21 @@ class SettingsController extends Controller
             Config::updateOrCreate(
                 ['key' => $key],
                 ['value' => $value]
+            );
+        }
+
+        // Salvar configurações de popups
+        if ($request->has('notifications_popup_max_count')) {
+            Config::updateOrCreate(
+                ['key' => 'notifications_popup_max_count'],
+                ['value' => (string) $request->input('notifications_popup_max_count', 2)]
+            );
+        }
+
+        if ($request->has('notifications_popup_auto_close_seconds')) {
+            Config::updateOrCreate(
+                ['key' => 'notifications_popup_auto_close_seconds'],
+                ['value' => (string) $request->input('notifications_popup_auto_close_seconds', 7)]
             );
         }
 
@@ -572,5 +598,202 @@ class SettingsController extends Controller
         }
 
         return $normalized;
+    }
+
+    public function indexPermissions(Request $request)
+    {
+        $user = $request->user();
+        
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Acesso negado');
+        }
+
+        $permissions = PermissionService::getSupervisorPermissions();
+        $modules = PermissionService::getAvailableModules();
+        $actions = PermissionService::getAvailableActions();
+
+        return compact('permissions', 'modules', 'actions');
+    }
+
+    public function updatePermissions(Request $request)
+    {
+        $user = $request->user();
+        
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Acesso negado');
+        }
+
+        $validated = $request->validate([
+            'permissions' => 'required|array',
+            'permissions.*' => 'array',
+            'permissions.*.*' => 'string|in:view,create,edit,delete,toggle',
+        ]);
+
+        try {
+            PermissionService::setSupervisorPermissions($validated['permissions']);
+
+            return redirect()
+                ->route('settings')
+                ->with('status', 'Permissões do Supervisor atualizadas com sucesso!');
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('settings')
+                ->withErrors(['error' => 'Erro ao salvar permissões: ' . $e->getMessage()]);
+        }
+    }
+
+    public function updateTheme(Request $request)
+    {
+        $user = $request->user();
+        
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Acesso negado');
+        }
+
+        $validated = $request->validate([
+            'monitor_theme' => 'required|string|max:50',
+        ]);
+
+        // Verificar se o tema existe
+        $themePath = resource_path("views/monitors/themes/{$validated['monitor_theme']}");
+        $dashboardPath = $themePath . '/dashboard.blade.php';
+        $layoutPath = $themePath . '/layout.blade.php';
+        
+        if (!is_dir($themePath) || !file_exists($dashboardPath) || !file_exists($layoutPath)) {
+            return redirect()
+                ->route('settings')
+                ->withErrors(['error' => 'Tema selecionado não existe ou está incompleto.']);
+        }
+
+        Config::updateOrCreate(
+            ['key' => 'monitor_theme'],
+            ['value' => $validated['monitor_theme']]
+        );
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Tema do monitor atualizado com sucesso!');
+    }
+
+    public function previewTheme(Request $request, string $theme)
+    {
+        $user = $request->user();
+        
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Acesso negado');
+        }
+
+        // Verificar se o tema existe
+        $themePath = resource_path("views/monitors/themes/{$theme}");
+        $dashboardPath = $themePath . '/dashboard.blade.php';
+        $layoutPath = $themePath . '/layout.blade.php';
+        
+        if (!is_dir($themePath) || !file_exists($dashboardPath) || !file_exists($layoutPath)) {
+            abort(404, 'Tema não encontrado');
+        }
+
+        // Buscar um monitor ativo para preview, ou criar um monitor fictício
+        $monitor = \App\Models\Monitor::where('is_active', true)->first();
+        
+        if (!$monitor) {
+            // Criar monitor fictício para preview
+            $monitor = new \App\Models\Monitor();
+            $monitor->id = '00000000-0000-0000-0000-000000000000';
+            $monitor->name = 'Preview do Tema';
+            $monitor->slug = 'preview';
+            $monitor->is_active = true;
+            $monitor->settings = [];
+        }
+
+        $settings = $monitor->getMergedSettings();
+        
+        // Usar GamificationService para construir dados
+        $gamificationService = app(\App\Services\GamificationService::class);
+        
+        // Obter dados do dashboard (sem filtro de usuário - público)
+        $teams = Team::orderBy('name')->get(['id', 'name']);
+        $activeTeam = null;
+
+        $sellersQuery = Seller::with(['team', 'season']);
+        $sellers = $sellersQuery
+            ->orderBy('points', 'desc')
+            ->limit(100)
+            ->get();
+
+        $ranking = $sellers->map(function ($seller) use ($gamificationService) {
+            $gamification = $gamificationService->getGamificationInfo($seller->points);
+            return [
+                'id' => $seller->id,
+                'name' => $seller->name,
+                'email' => $seller->email,
+                'points' => $seller->points,
+                'level' => $gamification['level'],
+                'badge' => $gamification['badge'],
+                'progress' => $gamification['progress'],
+                'position' => 0,
+                'team' => $seller->team?->name,
+                'season' => $seller->season?->name,
+            ];
+        })->values();
+
+        $ranking = $ranking->map(function ($entry, $index) {
+            $entry['position'] = $index + 1;
+            return $entry;
+        });
+
+        $top3 = $ranking->take(3)->values();
+
+        $stats = [
+            'totalPoints' => $sellers->sum('points'),
+            'totalParticipants' => $sellers->count(),
+            'activeParticipants' => $sellers->where('status', 'active')->count(),
+            'averagePoints' => $sellers->avg('points') ?? 0,
+        ];
+
+        $percentage = number_format((($stats['totalPoints'] ?? 0) / 500000) * 100, 2);
+
+        $configs = Config::all()->pluck('value', 'key');
+        
+        // Normalizar configuração de eventos de notificação
+        $notificationEventsConfig = $this->normalizeNotificationEventsConfig(
+            $configs['notifications_events_config'] ?? null
+        );
+
+        // Preparar configuração JavaScript do monitor
+        $voiceEnabledValue = $settings['voice_enabled'] ?? false;
+        if (is_string($voiceEnabledValue)) {
+            $voiceEnabledValue = in_array(strtolower($voiceEnabledValue), ['true', '1', 'yes', 'on']);
+        } elseif (is_int($voiceEnabledValue)) {
+            $voiceEnabledValue = $voiceEnabledValue === 1;
+        } else {
+            $voiceEnabledValue = (bool)$voiceEnabledValue;
+        }
+        
+        $dashboardConfig = [
+            'refresh_interval' => $settings['refresh_interval'] ?? 30000,
+            'auto_rotate_teams' => (bool)($settings['auto_rotate_teams'] ?? true),
+            'teams' => $settings['teams'] ?? [],
+            'notifications_enabled' => (bool)($settings['notifications_enabled'] ?? false),
+            'sound_enabled' => (bool)($settings['sound_enabled'] ?? false),
+            'voice_enabled' => $voiceEnabledValue,
+            'font_scale' => $settings['font_scale'] ?? 1.0,
+            'monitor_slug' => $monitor->slug,
+        ];
+
+        // Forçar o tema selecionado para preview
+        $themeName = $theme;
+        
+        return view("monitors.themes.{$themeName}.dashboard", [
+            'teams' => $teams,
+            'activeTeam' => $activeTeam,
+            'ranking' => $ranking,
+            'top3' => $top3,
+            'stats' => $stats,
+            'percentage' => $percentage,
+            'configs' => $configs,
+            'notificationEventsConfig' => $notificationEventsConfig,
+            'monitor' => $monitor,
+            'dashboardConfig' => $dashboardConfig,
+        ]);
     }
 }

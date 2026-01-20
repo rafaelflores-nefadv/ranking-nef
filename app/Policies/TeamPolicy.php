@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Services\PermissionService;
 
 class TeamPolicy
 {
@@ -12,8 +13,17 @@ class TeamPolicy
      */
     public function viewAny(User $user): bool
     {
-        // admin e supervisor podem ver
-        return in_array($user->role, ['admin', 'supervisor']);
+        // Admin sempre pode ver
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        // Supervisor: verificar permissão configurável
+        if ($user->role === 'supervisor') {
+            return PermissionService::can($user, 'teams', 'view');
+        }
+
+        return false;
     }
 
     /**
@@ -40,8 +50,17 @@ class TeamPolicy
      */
     public function create(User $user): bool
     {
-        // Apenas admin pode criar
-        return $user->role === 'admin';
+        // Admin sempre pode criar
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        // Supervisor: verificar permissão configurável
+        if ($user->role === 'supervisor') {
+            return PermissionService::can($user, 'teams', 'create');
+        }
+
+        return false;
     }
 
     /**
@@ -49,8 +68,22 @@ class TeamPolicy
      */
     public function update(User $user, Team $team): bool
     {
-        // Apenas admin pode editar
-        return $user->role === 'admin';
+        // Admin sempre pode editar
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        // Supervisor: verificar permissão configurável e se a equipe está nas suas equipes
+        if ($user->role === 'supervisor') {
+            if (!PermissionService::can($user, 'teams', 'edit')) {
+                return false;
+            }
+            
+            $allowedTeamIds = $user->getSupervisedTeamIds();
+            return in_array($team->id, $allowedTeamIds);
+        }
+
+        return false;
     }
 
     /**
@@ -58,7 +91,21 @@ class TeamPolicy
      */
     public function delete(User $user, Team $team): bool
     {
-        // Apenas admin pode deletar
-        return $user->role === 'admin';
+        // Admin sempre pode deletar
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        // Supervisor: verificar permissão configurável e se a equipe está nas suas equipes
+        if ($user->role === 'supervisor') {
+            if (!PermissionService::can($user, 'teams', 'delete')) {
+                return false;
+            }
+            
+            $allowedTeamIds = $user->getSupervisedTeamIds();
+            return in_array($team->id, $allowedTeamIds);
+        }
+
+        return false;
     }
 }

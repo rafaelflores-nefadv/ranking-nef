@@ -17,7 +17,10 @@
 
         <div class="space-y-6">
             <div class="flex flex-wrap gap-2 bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-2">
-                <button type="button" data-tab-button="gerais" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white">
+                <button type="button" data-tab-button="usuarios" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white">
+                    Usuários
+                </button>
+                <button type="button" data-tab-button="gerais" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
                     Gerais
                 </button>
                 <button type="button" data-tab-button="temporadas" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
@@ -29,14 +32,17 @@
                 <button type="button" data-tab-button="notificacoes" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
                     Notificações
                 </button>
-                <button type="button" data-tab-button="usuarios" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
-                    Usuários
-                </button>
                 @if(($configs['notifications_sound_enabled'] ?? 'true') === 'true')
                 <button type="button" data-tab-button="sons" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
                     Sons
                 </button>
                 @endif
+                <button type="button" data-tab-button="api" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
+                    API
+                </button>
+                <button type="button" data-tab-button="temas" class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
+                    Temas
+                </button>
             </div>
 
             <!-- Configurações Gerais -->
@@ -420,6 +426,32 @@
                                 />
                             </div>
                         </label>
+                        <div class="grid gap-4 md:grid-cols-2 mt-4">
+                            <label class="block p-4 rounded-lg bg-slate-800/50 border border-slate-700/60">
+                                <p class="text-white font-medium mb-2">Quantidade máxima de popups</p>
+                                <input
+                                    type="number"
+                                    name="notifications_popup_max_count"
+                                    min="1"
+                                    max="10"
+                                    value="{{ $configs['notifications_popup_max_count'] ?? '2' }}"
+                                    class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
+                                />
+                                <p class="text-slate-400 text-xs mt-2">Número máximo de notificações popup visíveis simultaneamente (1-10).</p>
+                            </label>
+                            <label class="block p-4 rounded-lg bg-slate-800/50 border border-slate-700/60">
+                                <p class="text-white font-medium mb-2">Tempo para fechar automaticamente (segundos)</p>
+                                <input
+                                    type="number"
+                                    name="notifications_popup_auto_close_seconds"
+                                    min="1"
+                                    max="60"
+                                    value="{{ $configs['notifications_popup_auto_close_seconds'] ?? '7' }}"
+                                    class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
+                                />
+                                <p class="text-slate-400 text-xs mt-2">Tempo em segundos até a notificação fechar automaticamente (1-60).</p>
+                            </label>
+                        </div>
                         <div class="mt-6 pt-6 border-t border-slate-800/60 flex justify-end">
                             <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
                                 Salvar
@@ -581,20 +613,66 @@
 
             <!-- Usuários -->
             <div data-tab="usuarios" class="settings-tab hidden bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
-                <div class="mb-4">
-                    <h2 class="text-xl font-bold text-white">Usuários do Sistema</h2>
-                    <p class="text-slate-400 text-sm">Gerencie os usuários que podem acessar o sistema (Administradores e Supervisores).</p>
-                </div>
-                <div class="mb-4">
-                    <a href="{{ route('users.index') }}" class="inline-block px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
-                        Gerenciar Usuários
-                    </a>
-                </div>
-                <div class="bg-slate-800/50 rounded-lg p-4 border border-slate-700/60">
-                    <p class="text-slate-300 text-sm">
-                        <strong class="text-white">Administradores:</strong> Acesso completo ao sistema, incluindo todas as configurações.<br>
-                        <strong class="text-white">Supervisores:</strong> Podem gerenciar colaboradores e equipes, mas não têm acesso às configurações do sistema.
-                    </p>
+                <div class="space-y-6">
+                    <!-- Gerenciar Usuários -->
+                    <div>
+                        <h2 class="text-xl font-bold text-white mb-2">Usuários do Sistema</h2>
+                        <p class="text-slate-400 text-sm mb-4">Gerencie os usuários que podem acessar o sistema (Administradores e Supervisores).</p>
+                        <div class="mb-4">
+                            <a href="{{ route('users.index') }}" class="inline-block px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
+                                Gerenciar Usuários
+                            </a>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4 border border-slate-700/60">
+                            <p class="text-slate-300 text-sm">
+                                <strong class="text-white">Administradores:</strong> Acesso completo ao sistema, incluindo todas as configurações.<br>
+                                <strong class="text-white">Supervisores:</strong> Permissões configuráveis abaixo. As permissões aplicam-se a TODOS os supervisores.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Permissões do Supervisor -->
+                    <div class="border-t border-slate-800/60 pt-6">
+                        <form action="{{ route('settings.permissions.update') }}" method="POST">
+                            @csrf
+                            @method('PUT')
+                            <div class="mb-4">
+                                <h3 class="text-lg font-semibold text-white">Permissões do Supervisor</h3>
+                                <p class="text-slate-400 text-sm">Configure quais módulos e ações os supervisores podem acessar.</p>
+                            </div>
+
+                            <div class="space-y-4">
+                                @foreach($availableModules ?? [] as $moduleKey => $moduleLabel)
+                                    <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700/60">
+                                        <h4 class="text-white font-medium mb-3">{{ $moduleLabel }}</h4>
+                                        <div class="flex flex-wrap gap-4">
+                                            @foreach($availableActions ?? [] as $actionKey => $actionLabel)
+                                                <label class="flex items-center gap-2 text-slate-300 text-sm cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        name="permissions[{{ $moduleKey }}][]"
+                                                        value="{{ $actionKey }}"
+                                                        class="h-4 w-4 accent-blue-600"
+                                                        {{ isset($supervisorPermissions[$moduleKey]) && in_array($actionKey, $supervisorPermissions[$moduleKey], true) ? 'checked' : '' }}
+                                                    />
+                                                    <span>{{ $actionLabel }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div class="mt-6 pt-6 border-t border-slate-800/60 flex justify-end gap-2">
+                                <button type="button" onclick="resetPermissions()" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold">
+                                    Restaurar Padrão
+                                </button>
+                                <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+                                    Salvar Permissões
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
 
@@ -700,6 +778,101 @@
                 </form>
             </div>
             @endif
+
+            <!-- Temas -->
+            <div data-tab="temas" class="settings-tab hidden bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
+                <form action="{{ route('settings.themes.update') }}" method="POST">
+                    @csrf
+                    @method('PUT')
+                    <div class="mb-4">
+                        <h2 class="text-xl font-bold text-white mb-2">Temas do Monitor</h2>
+                        <p class="text-slate-400 text-sm">Selecione o tema visual padrão para o Monitor.</p>
+                    </div>
+                    @php
+                        $themesPath = resource_path('views/monitors/themes');
+                        $availableThemes = [];
+                        if (is_dir($themesPath)) {
+                            $directories = array_filter(glob($themesPath . '/*'), 'is_dir');
+                            foreach ($directories as $dir) {
+                                $themeName = basename($dir);
+                                $dashboardPath = $dir . '/dashboard.blade.php';
+                                $layoutPath = $dir . '/layout.blade.php';
+                                if (file_exists($dashboardPath) && file_exists($layoutPath)) {
+                                    $availableThemes[] = $themeName;
+                                }
+                            }
+                        }
+                        $currentTheme = $configs['monitor_theme'] ?? 'default';
+                    @endphp
+                    <div class="space-y-3">
+                        @foreach($availableThemes as $themeName)
+                            <div class="flex items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/60 hover:bg-slate-800/70 transition-colors">
+                                <label class="flex items-center gap-3 flex-1 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="monitor_theme"
+                                        value="{{ $themeName }}"
+                                        {{ $currentTheme === $themeName ? 'checked' : '' }}
+                                        class="h-4 w-4 accent-blue-600"
+                                    />
+                                    <div class="flex-1">
+                                        <p class="text-white font-medium">{{ ucfirst($themeName) }}</p>
+                                        <p class="text-slate-400 text-xs mt-1">Tema {{ $themeName === 'default' ? 'padrão do sistema' : $themeName }}</p>
+                                    </div>
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    @if($currentTheme === $themeName)
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-600/20 text-blue-400">
+                                            Ativo
+                                        </span>
+                                    @endif
+                                    <a 
+                                        href="{{ route('settings.themes.preview', $themeName) }}" 
+                                        target="_blank"
+                                        class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors flex items-center gap-1.5"
+                                        title="Visualizar tema em nova aba"
+                                    >
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Visualizar
+                                    </a>
+                                </div>
+                            </div>
+                        @endforeach
+                        @if(empty($availableThemes))
+                            <p class="text-slate-400 text-sm p-4 bg-slate-800/50 rounded-lg border border-slate-700/60">
+                                Nenhum tema disponível encontrado.
+                            </p>
+                        @endif
+                    </div>
+                    <div class="mt-6 pt-6 border-t border-slate-800/60 flex justify-end">
+                        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+                            Salvar Tema
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- API -->
+            <div data-tab="api" class="settings-tab hidden bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
+                <div class="mb-4">
+                    <h2 class="text-xl font-bold text-white mb-2">Integrações API</h2>
+                    <p class="text-slate-400 text-sm">Gerencie as integrações e tokens de acesso à API para sistemas externos.</p>
+                </div>
+                <div class="mb-4">
+                    <a href="{{ route('settings.api.index') }}" class="inline-block px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
+                        Gerenciar Integrações API
+                    </a>
+                </div>
+                <div class="bg-slate-800/50 rounded-lg p-4 border border-slate-700/60">
+                    <p class="text-slate-300 text-sm">
+                        <strong class="text-white">Integrações API:</strong> Configure integrações para sistemas externos que enviam ocorrências via webhook.<br>
+                        <strong class="text-white">Tokens:</strong> Cada integração pode ter um ou mais tokens de acesso. O token deve ser usado no header <code class="px-1 py-0.5 bg-slate-900 rounded text-xs">Authorization: Bearer {TOKEN}</code> no endpoint <code class="px-1 py-0.5 bg-slate-900 rounded text-xs">POST /api/webhook/occurrences</code>.
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -737,7 +910,7 @@
             button.addEventListener('click', () => setActive(button.getAttribute('data-tab-button')));
         });
 
-        setActive('gerais');
+        setActive('usuarios');
 
         const voiceSelect = document.getElementById('voice-browser-select');
         if (voiceSelect && 'speechSynthesis' in window) {
@@ -978,6 +1151,30 @@
                 }
             });
         }
+
+        // Funcionalidade de resetar permissões
+        window.resetPermissions = function() {
+            const defaultPermissions = @json(\App\Services\PermissionService::getDefaultPermissions());
+            const modules = @json($availableModules ?? []);
+            const actions = @json($availableActions ?? []);
+
+            // Limpar todos os checkboxes
+            document.querySelectorAll('input[name^="permissions["]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+
+            // Marcar permissões padrão
+            Object.keys(defaultPermissions).forEach(moduleKey => {
+                if (defaultPermissions[moduleKey] && Array.isArray(defaultPermissions[moduleKey])) {
+                    defaultPermissions[moduleKey].forEach(actionKey => {
+                        const checkbox = document.querySelector(`input[name="permissions[${moduleKey}][]"][value="${actionKey}"]`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                        }
+                    });
+                }
+            });
+        };
 
         // Funcionalidade de exclusão de regras
         const deleteRuleBtns = document.querySelectorAll('.delete-rule-btn');

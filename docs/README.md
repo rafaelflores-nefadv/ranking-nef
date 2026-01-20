@@ -59,6 +59,7 @@ Senha padrao: `password`
   - regras de pontuacao
   - notificacoes
   - parametros gerais e de temporada
+  - **Temas do Monitor** - Personalize o layout visual do monitor
 - Notificacoes com historico e filtros por data.
 - Webhook para entrada de ocorrencias.
 
@@ -144,6 +145,16 @@ Resposta:
 O `GamificationService` converte pontos em nivel, badge e progresso
 para o dashboard.
 
+## Temas do Monitor
+O sistema permite criar e selecionar temas visuais personalizados para o Monitor.
+
+- Temas disponiveis em `resources/views/monitors/themes/`
+- Cada tema deve conter `layout.blade.php` e `dashboard.blade.php`
+- Configuracao em: Configuracoes > Temas (apenas admin)
+- Tema padrao: `default`
+
+**Documentacao completa:** Veja [CRIAR_TEMAS.md](./CRIAR_TEMAS.md) para instrucoes detalhadas sobre como criar novos temas.
+
 ## Configuracoes do sistema
 Chaves em `configs` (seed inicial):
 - `auto_process_occurrences`: processar automaticamente ocorrencias
@@ -164,6 +175,7 @@ Chaves em `configs` (seed inicial):
 - `notifications_voice_only_when_changed`: somente quando ranking mudar
 - `notifications_voice_name`: nome da voz do TTS (opcional)
 - `notifications_voice_browser_name`: nome da voz do navegador (opcional)
+- `monitor_theme`: tema visual do monitor (padrao: `default`)
 
 ## Jobs e filas
 - `ProcessApiOccurrencesJob`: processa ocorrencias em lotes.
@@ -240,6 +252,8 @@ database/
   migrations/
   seeders/
 docs/             # Documentação
+  README.md       # Documentação geral
+  CRIAR_TEMAS.md  # Guia para criar novos temas do monitor
 ```
 
 ## Testes

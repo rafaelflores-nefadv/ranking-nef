@@ -27,6 +27,11 @@ Route::get('/monitor/{slug}', [MonitorController::class, 'show'])->name('monitor
 Route::get('/monitor/{slug}/data', [MonitorController::class, 'data'])->name('monitor.data');
 Route::get('/monitor/{slug}/voice', [MonitorController::class, 'voiceText'])->name('monitor.voice');
 
+// Rotas públicas para notificações do monitor (sem autenticação)
+Route::get('/scores/recent', [ScoreController::class, 'recent'])->name('scores.recent');
+Route::get('/notifications/voice/recent', [NotificationController::class, 'voiceRecent'])
+    ->name('notifications.voice.recent');
+
 // Rotas protegidas
 Route::middleware('auth')->group(function () {
     // Dashboard
@@ -101,13 +106,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/{apiIntegration}/tokens/{apiToken}/regenerate', [ApiIntegrationController::class, 'regenerateToken'])->name('tokens.regenerate');
     });
 
-    // Vendas recentes para notificações
-    Route::get('/scores/recent', [ScoreController::class, 'recent'])->name('scores.recent');
-
-    // Página de notificações
+    // Página de notificações (requer autenticação)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-    Route::get('/notifications/voice/recent', [NotificationController::class, 'voiceRecent'])
-        ->name('notifications.voice.recent');
 
     // Relatórios
     Route::prefix('reports')->name('reports.')->group(function () {
