@@ -82,6 +82,8 @@ Senha padrao: `password`
 - `POST /api/webhook/occurrences` recebe ocorrencias externas
 - `GET /scores/recent` vendas recentes para notificacoes (JSON)
 
+**Documentacao completa da API:** Veja [API.md](./API.md) para instrucoes detalhadas sobre como integrar sistemas de terceiros.
+
 ## Webhook de ocorrencias
 Endpoint: `POST /api/webhook/occurrences`
 
@@ -253,6 +255,7 @@ database/
   seeders/
 docs/             # Documentação
   README.md       # Documentação geral
+  API.md          # Documentação da API para integração com terceiros
   CRIAR_TEMAS.md  # Guia para criar novos temas do monitor
 ```
 

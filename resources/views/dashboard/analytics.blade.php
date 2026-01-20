@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Análise de Receita e Margem - Ranking NEF')
+@section('title', 'Dashboard - Ranking NEF')
 
 @section('content')
 <div class="min-h-screen bg-[#0a0e1a]">
