@@ -27,6 +27,8 @@ class UpdateTeamRequest extends FormRequest
         
         return [
             'name' => ['required', 'string', 'max:255', Rule::unique('teams')->ignore($team->id)],
+            'sellers' => ['nullable', 'array'],
+            'sellers.*' => ['exists:sellers,id'],
         ];
     }
 
