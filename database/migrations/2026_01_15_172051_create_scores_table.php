@@ -18,6 +18,10 @@ return new class extends Migration
             $table->decimal('points', 10, 2);
             $table->timestamp('created_at')->nullable();
 
+            $table->index('seller_id');
+            $table->index('score_rule_id');
+            $table->index('created_at');
+
             $table->foreign('seller_id')->references('id')->on('sellers')->onDelete('cascade');
             $table->foreign('score_rule_id')->references('id')->on('score_rules')->onDelete('cascade');
         });

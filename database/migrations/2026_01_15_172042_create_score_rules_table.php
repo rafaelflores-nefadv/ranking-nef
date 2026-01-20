@@ -19,6 +19,10 @@ return new class extends Migration
             $table->integer('priority')->default(0);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+
+            $table->index('ocorrencia');
+            $table->index('is_active');
+            $table->index(['ocorrencia', 'is_active']);
         });
     }
 

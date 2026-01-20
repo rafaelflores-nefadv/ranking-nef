@@ -21,6 +21,11 @@ return new class extends Migration
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
 
+            $table->index('points');
+            $table->index('team_id');
+            $table->index('season_id');
+            $table->index('status');
+
             $table->foreign('team_id')->references('id')->on('teams')->onDelete('set null');
             $table->foreign('season_id')->references('id')->on('seasons')->onDelete('set null');
         });

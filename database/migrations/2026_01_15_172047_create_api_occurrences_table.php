@@ -20,6 +20,11 @@ return new class extends Migration
             $table->boolean('processed')->default(false);
             $table->text('error_message')->nullable();
             $table->timestamps();
+
+            $table->index('processed');
+            $table->index('ocorrencia');
+            $table->index('email_funcionario');
+            $table->index(['processed', 'created_at']);
         });
     }
 
