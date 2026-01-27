@@ -11,6 +11,13 @@
         </div>
 
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
+            <!-- Foto de Perfil -->
+            <div class="mb-6 flex items-center justify-center">
+                <img src="{{ $seller->avatar ? asset('storage/' . $seller->avatar) : 'https://ui-avatars.com/api/?name=' . urlencode($seller->name) . '&background=6366f1&color=fff&size=200' }}" 
+                     alt="{{ $seller->name }}" 
+                     class="w-32 h-32 rounded-full object-cover border-4 border-slate-600 shadow-lg">
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Nome</label>
@@ -20,6 +27,10 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Email</label>
                     <p class="text-white">{{ $seller->email }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Código Externo</label>
+                    <p class="text-white">{{ $seller->external_code ?? '—' }}</p>
                 </div>
 
                 <div>

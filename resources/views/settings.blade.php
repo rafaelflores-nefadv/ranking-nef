@@ -141,25 +141,77 @@
                     @endforelse
                 </div>
                 <div class="mt-6 pt-6 border-t border-slate-800/60">
-                    <form action="{{ route('settings.seasons.options.update') }}" method="POST">
+                    <form action="{{ route('settings.seasons.options.update') }}" method="POST" id="season-options-form">
                         @csrf
                         @method('PUT')
                         <div class="mb-4">
                             <h3 class="text-lg font-semibold text-white">Opções da temporada</h3>
                             <p class="text-slate-400 text-sm">Defina duração e renovação automática.</p>
                         </div>
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <label class="block p-4 rounded-lg bg-slate-800/50 border border-slate-700/60">
-                                <p class="text-white font-medium mb-2">Duração padrão (dias)</p>
-                                <input
-                                    type="number"
-                                    name="season_duration_days"
-                                    min="1"
-                                    max="3650"
-                                    value="{{ $configs['season_duration_days'] ?? '365' }}"
-                                    class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
-                                />
-                            </label>
+                        
+                        <!-- Campo Recorrente (hidden input para o valor selecionado) -->
+                        <input type="hidden" name="season_recurrence_type" id="season_recurrence_type" value="{{ $configs['season_recurrence_type'] ?? 'days' }}">
+                        
+                        <!-- Seleção de Recorrência -->
+                        <div class="mb-6">
+                            <label class="block text-white font-medium mb-3">Recorrente</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" class="recurrence-btn px-4 py-2 rounded-lg text-sm font-semibold transition-colors {{ ($configs['season_recurrence_type'] ?? 'days') === 'daily' ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60' }}" data-value="daily">
+                                    Diário
+                                </button>
+                                <button type="button" class="recurrence-btn px-4 py-2 rounded-lg text-sm font-semibold transition-colors {{ ($configs['season_recurrence_type'] ?? 'days') === 'weekly' ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60' }}" data-value="weekly">
+                                    Semanal
+                                </button>
+                                <button type="button" class="recurrence-btn px-4 py-2 rounded-lg text-sm font-semibold transition-colors {{ ($configs['season_recurrence_type'] ?? 'days') === 'monthly' ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60' }}" data-value="monthly">
+                                    Mensal
+                                </button>
+                                <button type="button" class="recurrence-btn px-4 py-2 rounded-lg text-sm font-semibold transition-colors {{ ($configs['season_recurrence_type'] ?? 'days') === 'bimonthly' ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60' }}" data-value="bimonthly">
+                                    Bimestral
+                                </button>
+                                <button type="button" class="recurrence-btn px-4 py-2 rounded-lg text-sm font-semibold transition-colors {{ ($configs['season_recurrence_type'] ?? 'days') === 'quarterly' ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60' }}" data-value="quarterly">
+                                    Trimestre
+                                </button>
+                                <button type="button" class="recurrence-btn px-4 py-2 rounded-lg text-sm font-semibold transition-colors {{ ($configs['season_recurrence_type'] ?? 'days') === 'semiannual' ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60' }}" data-value="semiannual">
+                                    Semestre
+                                </button>
+                                <button type="button" class="recurrence-btn px-4 py-2 rounded-lg text-sm font-semibold transition-colors {{ ($configs['season_recurrence_type'] ?? 'days') === 'annual' ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60' }}" data-value="annual">
+                                    Anual
+                                </button>
+                                <button type="button" class="recurrence-btn px-4 py-2 rounded-lg text-sm font-semibold transition-colors {{ ($configs['season_recurrence_type'] ?? 'days') === 'fixed_date' ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60' }}" data-value="fixed_date">
+                                    Data fixa
+                                </button>
+                                <button type="button" class="recurrence-btn px-4 py-2 rounded-lg text-sm font-semibold transition-colors {{ ($configs['season_recurrence_type'] ?? 'days') === 'days' ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60' }}" data-value="days">
+                                    Dias
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Campo Fim da campanha (aparece quando selecionar "fixed_date") -->
+                        <div id="campaign-end-container" class="mb-4 {{ ($configs['season_recurrence_type'] ?? 'days') === 'fixed_date' ? '' : 'hidden' }}">
+                            <label class="block text-white font-medium mb-2">Fim da campanha</label>
+                            <input
+                                type="date"
+                                name="season_fixed_end_date"
+                                value="{{ $configs['season_fixed_end_date'] ?? '' }}"
+                                class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
+                            />
+                        </div>
+                        
+                        <!-- Campo Duração em Dias (aparece quando selecionar "days") -->
+                        <div id="duration-days-container" class="mb-4 {{ ($configs['season_recurrence_type'] ?? 'days') === 'days' ? '' : 'hidden' }}">
+                            <label class="block text-white font-medium mb-2">Duração padrão (dias)</label>
+                            <input
+                                type="number"
+                                name="season_duration_days"
+                                min="1"
+                                max="3650"
+                                value="{{ $configs['season_duration_days'] ?? '365' }}"
+                                class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
+                            />
+                        </div>
+                        
+                        <!-- Renovação automática -->
+                        <div class="mb-4">
                             <label class="flex items-center justify-between gap-4 p-4 rounded-lg bg-slate-800/50 border border-slate-700/60">
                                 <div>
                                     <p class="text-white font-medium">Renovação automática</p>
@@ -179,6 +231,7 @@
                                 </div>
                             </label>
                         </div>
+                        
                         <div class="mt-6 pt-6 border-t border-slate-800/60 flex justify-end">
                             <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
                                 Salvar
@@ -193,9 +246,32 @@
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-xl font-bold text-white">Regras de Pontuação</h2>
                 </div>
+
+                @php
+                    $user = auth()->user();
+                    $isAdmin = $user && $user->role === 'admin';
+                    $currentSectorName = $isAdmin && isset($sectorOptions)
+                        ? optional($sectorOptions->firstWhere('id', $currentSectorId ?? null))->name
+                        : ($user?->sector?->name ?? null);
+                @endphp
+
+                @if($isAdmin && isset($sectorOptions) && $sectorOptions->isNotEmpty())
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Setor</label>
+                        <select id="score-rules-sector" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Selecione um setor</option>
+                            @foreach($sectorOptions as $sector)
+                                <option value="{{ $sector->id }}" {{ ($currentSectorId ?? null) === $sector->id ? 'selected' : '' }}>
+                                    {{ $sector->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-slate-400">Regras exibidas para: <span class="text-slate-200">{{ $currentSectorName ?? 'Não selecionado' }}</span></p>
+                    </div>
+                @endif
                 
                 <!-- Formulário para adicionar nova regra -->
-                <form action="{{ route('settings.score-rules.store') }}" method="POST" class="mb-6 p-4 rounded-lg bg-slate-800/50 border border-slate-700/60">
+                <form action="{{ route('settings.score-rules.store', ['sector' => $currentSectorId ?? null]) }}" method="POST" class="mb-6 p-4 rounded-lg bg-slate-800/50 border border-slate-700/60">
                     @csrf
                     <div class="flex items-center gap-4 flex-wrap">
                         <div class="flex-1 min-w-[120px]">
@@ -204,8 +280,9 @@
                                 type="text"
                                 name="ocorrencia"
                                 required
+                                {{ $isAdmin && empty($currentSectorId) ? 'disabled' : '' }}
                                 placeholder="Ex: venda"
-                                class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
+                                class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm {{ $isAdmin && empty($currentSectorId) ? 'opacity-50 cursor-not-allowed' : '' }}"
                             />
                         </div>
                         <div class="w-24">
@@ -215,26 +292,9 @@
                                 name="points"
                                 step="0.01"
                                 required
+                                {{ $isAdmin && empty($currentSectorId) ? 'disabled' : '' }}
                                 placeholder="0.00"
-                                class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
-                            />
-                        </div>
-                        <div class="flex-1 min-w-[200px]">
-                            <label class="block text-slate-300 text-xs mb-1">Descrição</label>
-                            <input
-                                type="text"
-                                name="description"
-                                placeholder="Descrição da regra"
-                                class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
-                            />
-                        </div>
-                        <div class="w-20">
-                            <label class="block text-slate-300 text-xs mb-1">Prioridade</label>
-                            <input
-                                type="number"
-                                name="priority"
-                                value="0"
-                                class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
+                                class="w-full bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm {{ $isAdmin && empty($currentSectorId) ? 'opacity-50 cursor-not-allowed' : '' }}"
                             />
                         </div>
                         <div class="flex items-end gap-3">
@@ -250,12 +310,16 @@
                             </label>
                             <button
                                 type="submit"
+                                {{ $isAdmin && empty($currentSectorId) ? 'disabled' : '' }}
                                 class="px-4 py-2 rounded-md bg-green-600 hover:bg-green-700 text-white text-sm font-semibold whitespace-nowrap"
                             >
                                 Adicionar Regra
                             </button>
                         </div>
                     </div>
+                    @if($isAdmin && empty($currentSectorId))
+                        <p class="mt-3 text-xs text-slate-400">Selecione um setor para criar regras.</p>
+                    @endif
                 </form>
 
                 <div class="overflow-x-auto">
@@ -264,8 +328,6 @@
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Ocorrência</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Pontos</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Descrição</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Prioridade</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Ativo</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">Ações</th>
                             </tr>
@@ -273,7 +335,7 @@
                         <tbody class="divide-y divide-slate-700/50">
                             @forelse($scoreRules as $rule)
                             <tr class="hover:bg-slate-800/30">
-                                <form id="score-rule-{{ $rule->id }}" action="{{ route('settings.score-rules.update', $rule) }}" method="POST">
+                                <form id="score-rule-{{ $rule->id }}" action="{{ route('settings.score-rules.update', ['scoreRule' => $rule, 'sector' => $currentSectorId ?? null]) }}" method="POST">
                                     @csrf
                                     @method('PUT')
                                 </form>
@@ -294,25 +356,6 @@
                                         step="0.01"
                                         value="{{ $rule->points }}"
                                         class="w-24 bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
-                                    />
-                                </td>
-                                <td class="px-6 py-4">
-                                    <input
-                                        form="score-rule-{{ $rule->id }}"
-                                        type="text"
-                                        name="description"
-                                        value="{{ $rule->description }}"
-                                        placeholder="Descrição"
-                                        class="w-full min-w-[220px] bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
-                                    />
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <input
-                                        form="score-rule-{{ $rule->id }}"
-                                        type="number"
-                                        name="priority"
-                                        value="{{ $rule->priority }}"
-                                        class="w-20 bg-slate-900/60 border border-slate-700 text-white rounded-md px-3 py-2 text-sm"
                                     />
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
@@ -350,7 +393,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-8 text-center text-slate-400">
+                                <td colspan="4" class="px-6 py-8 text-center text-slate-400">
                                     Nenhuma regra encontrada
                                 </td>
                             </tr>
@@ -912,6 +955,19 @@
 
         setActive('usuarios');
 
+        const scoreRulesSector = document.getElementById('score-rules-sector');
+        if (scoreRulesSector) {
+            scoreRulesSector.addEventListener('change', () => {
+                const url = new URL(window.location.href);
+                if (scoreRulesSector.value) {
+                    url.searchParams.set('sector', scoreRulesSector.value);
+                } else {
+                    url.searchParams.delete('sector');
+                }
+                window.location.href = url.toString();
+            });
+        }
+
         const voiceSelect = document.getElementById('voice-browser-select');
         if (voiceSelect && 'speechSynthesis' in window) {
             const savedVoice = @json($configs['notifications_voice_browser_name'] ?? '');
@@ -1175,6 +1231,54 @@
                 }
             });
         };
+
+        // Funcionalidade de recorrência de temporadas
+        const recurrenceBtns = document.querySelectorAll('.recurrence-btn');
+        const recurrenceTypeInput = document.getElementById('season_recurrence_type');
+        const campaignEndContainer = document.getElementById('campaign-end-container');
+        const durationDaysContainer = document.getElementById('duration-days-container');
+
+        function updateRecurrenceUI(selectedValue) {
+            // Atualizar botões
+            recurrenceBtns.forEach(btn => {
+                const value = btn.dataset.value;
+                if (value === selectedValue) {
+                    btn.classList.remove('bg-slate-800/50', 'text-slate-300', 'hover:bg-slate-700/60');
+                    btn.classList.add('bg-blue-600', 'text-white');
+                } else {
+                    btn.classList.remove('bg-blue-600', 'text-white');
+                    btn.classList.add('bg-slate-800/50', 'text-slate-300', 'hover:bg-slate-700/60');
+                }
+            });
+
+            // Atualizar input hidden
+            if (recurrenceTypeInput) {
+                recurrenceTypeInput.value = selectedValue;
+            }
+
+            // Mostrar/ocultar campos baseado na seleção
+            if (selectedValue === 'fixed_date') {
+                campaignEndContainer?.classList.remove('hidden');
+                durationDaysContainer?.classList.add('hidden');
+            } else if (selectedValue === 'days') {
+                campaignEndContainer?.classList.add('hidden');
+                durationDaysContainer?.classList.remove('hidden');
+            } else {
+                campaignEndContainer?.classList.add('hidden');
+                durationDaysContainer?.classList.add('hidden');
+            }
+        }
+
+        recurrenceBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const value = btn.dataset.value;
+                updateRecurrenceUI(value);
+            });
+        });
+
+        // Inicializar UI baseado no valor atual
+        const currentValue = recurrenceTypeInput?.value || 'days';
+        updateRecurrenceUI(currentValue);
 
         // Funcionalidade de exclusão de regras
         const deleteRuleBtns = document.querySelectorAll('.delete-rule-btn');

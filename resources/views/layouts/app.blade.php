@@ -287,7 +287,7 @@
 
                 items.forEach((sale) => {
                     const sellerName = sale?.seller?.name || 'Colaborador';
-                    const occurrenceLabel = sale?.occurrence?.description || sale?.occurrence?.type || `${saleTerm} registrada`;
+                    const occurrenceLabel = sale?.occurrence?.type || `${saleTerm} registrada`;
                     const pointsLabel = formatPoints(sale?.points);
                     const timeLabel = formatTime(sale?.created_at);
 
@@ -469,5 +469,86 @@
             });
         </script>
     @endauth
+
+    <script>
+        // Atualizar token CSRF periodicamente para evitar erro 419
+        (function() {
+            let csrfUpdateInterval = null;
+            
+            // Função para atualizar o token CSRF
+            function updateCsrfToken() {
+                fetch('/csrf-token', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                }).then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch CSRF token');
+                    return response.json();
+                }).then(data => {
+                    if (data.token) {
+                        // Atualizar meta tag
+                        const metaTag = document.querySelector('meta[name="csrf-token"]');
+                        if (metaTag) {
+                            metaTag.setAttribute('content', data.token);
+                        }
+                        
+                        // Atualizar todos os inputs hidden com csrf token
+                        document.querySelectorAll('input[name="_token"]').forEach(input => {
+                            input.value = data.token;
+                        });
+                    }
+                }).catch(error => {
+                    console.warn('Não foi possível atualizar o token CSRF:', error);
+                });
+            }
+
+            // Atualizar token quando o DOM estiver pronto
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    updateCsrfToken();
+                    csrfUpdateInterval = setInterval(updateCsrfToken, 90000);
+                });
+            } else {
+                updateCsrfToken();
+                csrfUpdateInterval = setInterval(updateCsrfToken, 90000);
+            }
+
+            // Atualizar token quando a página ganha foco
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    updateCsrfToken();
+                }
+            });
+
+            // Interceptar envio de formulários para verificar e atualizar token
+            document.addEventListener('submit', function(e) {
+                const form = e.target;
+                if (form.tagName === 'FORM') {
+                    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                    const formToken = form.querySelector('input[name="_token"]')?.value;
+                    
+                    if (token && formToken && token !== formToken) {
+                        form.querySelector('input[name="_token"]').value = token;
+                    } else if (!formToken && token) {
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = '_token';
+                        hiddenInput.value = token;
+                        form.appendChild(hiddenInput);
+                    }
+                }
+            }, true);
+
+            // Limpar intervalo quando a página for descarregada
+            window.addEventListener('beforeunload', function() {
+                if (csrfUpdateInterval) {
+                    clearInterval(csrfUpdateInterval);
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

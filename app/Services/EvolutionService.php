@@ -21,13 +21,15 @@ class EvolutionService
      * @param array|null $allowedTeamIds IDs de equipes permitidas
      * @param Carbon|null $startDate Data de início
      * @param Carbon|null $endDate Data de fim
+     * @param string|null $sectorId Setor atual
      * @return Collection
      */
     public function getScoreEvolution(
         ?string $sellerId = null,
         ?array $allowedTeamIds = null,
         ?Carbon $startDate = null,
-        ?Carbon $endDate = null
+        ?Carbon $endDate = null,
+        ?string $sectorId = null
     ): Collection {
         $startDate = $startDate ?? Carbon::now()->subDays(30);
         $endDate = $endDate ?? Carbon::now();
@@ -39,9 +41,12 @@ class EvolutionService
                 DB::raw('SUM(points) as total_points'),
                 DB::raw('COUNT(*) as occurrences_count')
             )
-            ->with('seller.team')
+            ->with('seller.teams')
             ->whereBetween('created_at', [$startDate->startOfDay(), $endDate->endOfDay()])
             ->groupBy('seller_id', DB::raw('DATE(created_at)'));
+        if ($sectorId) {
+            $query->where('sector_id', $sectorId);
+        }
 
         // Filtro por vendedor
         if ($sellerId) {
@@ -53,7 +58,8 @@ class EvolutionService
         // Filtrar por equipes permitidas
         if ($allowedTeamIds !== null) {
             $scores = $scores->filter(function ($score) use ($allowedTeamIds) {
-                return $score->seller && in_array($score->seller->team_id, $allowedTeamIds);
+                return $score->seller
+                    && $score->seller->teams->pluck('id')->intersect($allowedTeamIds)->isNotEmpty();
             });
         }
 

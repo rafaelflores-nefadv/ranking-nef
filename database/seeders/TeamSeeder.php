@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Team;
+use App\Models\Sector;
 use Illuminate\Database\Seeder;
 
 class TeamSeeder extends Seeder
@@ -36,6 +37,8 @@ class TeamSeeder extends Seeder
             $this->command->info("Criando {$quantity} equipes...");
         }
 
+        $defaultSectorId = Sector::where('slug', 'geral')->value('id');
+
         // Nomes base para equipes
         $teamNames = [
             'Alpha', 'Beta', 'Gamma', 'Delta', 'Omega', 'Sigma',
@@ -48,8 +51,8 @@ class TeamSeeder extends Seeder
             $teamName = 'Equipe ' . ($teamNames[$i] ?? "Equipe " . ($i + 1));
             
             Team::updateOrCreate(
-                ['name' => $teamName],
-                ['name' => $teamName]
+                ['name' => $teamName, 'sector_id' => $defaultSectorId],
+                ['name' => $teamName, 'sector_id' => $defaultSectorId]
             );
         }
 

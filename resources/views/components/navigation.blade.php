@@ -30,13 +30,13 @@
                             Dashboard
                         </span>
                     </a>
-                    @if($user && in_array($user->role, ['admin', 'supervisor', 'user']))
-                        <a href="{{ route('sellers.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('sellers.*') ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-white hover:border-slate-300' }} text-sm font-medium">
+                    @if($isAdmin)
+                        <a href="{{ route('sectors.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('sectors.*') ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-white hover:border-slate-300' }} text-sm font-medium">
                             <span class="inline-flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 14a4 4 0 1 0-8 0m12 6v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                                 </svg>
-                                Vendedores
+                                Setores
                             </span>
                         </a>
                     @endif
@@ -50,6 +50,16 @@
                             </span>
                         </a>
                     @endif
+                    @if($user && in_array($user->role, ['admin', 'supervisor', 'user']))
+                        <a href="{{ route('sellers.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('sellers.*') ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-white hover:border-slate-300' }} text-sm font-medium">
+                            <span class="inline-flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 14a4 4 0 1 0-8 0m12 6v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path>
+                                </svg>
+                                Vendedores
+                            </span>
+                        </a>
+                    @endif
                     @can('viewAny', App\Models\Goal::class)
                         <a href="{{ route('goals.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('goals.*') ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-white hover:border-slate-300' }} text-sm font-medium">
                             <span class="inline-flex items-center gap-2">
@@ -60,16 +70,6 @@
                             </span>
                         </a>
                     @endcan
-                    @if($isAdmin)
-                        <a href="{{ route('admin.monitors.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.monitors.*') ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-white hover:border-slate-300' }} text-sm font-medium">
-                            <span class="inline-flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                                Monitores
-                            </span>
-                        </a>
-                    @endif
                     @if($user && in_array($user->role, ['admin', 'supervisor', 'user']))
                         <details class="relative group inline-flex items-center">
                             <summary class="list-none cursor-pointer inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('reports.*') ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-white hover:border-slate-300' }} text-sm font-medium">
@@ -108,6 +108,29 @@
             </div>
 
             <div class="flex items-center gap-3">
+                @if($isAdmin && isset($sectorOptions) && $sectorOptions->isNotEmpty())
+                    <div class="hidden lg:flex items-center gap-2">
+                        <span class="text-xs text-slate-400">Setor</span>
+                        <select id="sector-selector" class="w-36 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            @foreach($sectorOptions as $sector)
+                                <option value="{{ $sector->id }}" {{ ($currentSectorId ?? null) === $sector->id ? 'selected' : '' }}>
+                                    {{ $sector->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', () => {
+                            const selector = document.getElementById('sector-selector');
+                            if (!selector) return;
+                            selector.addEventListener('change', (event) => {
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('sector', event.target.value);
+                                window.location.href = url.toString();
+                            });
+                        });
+                    </script>
+                @endif
                 <details class="relative" id="notifications-dropdown">
                     <summary class="list-none cursor-pointer p-2 hover:bg-slate-800/60 rounded-lg transition-colors text-slate-300 hover:text-white relative">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,6 +179,12 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a2 2 0 0 1 2 2v.18a2 2 0 0 0 1 1.73l.43.25a2 2 0 0 0 2 0l.15-.08a2 2 0 0 1 2.73.73l.22.38a2 2 0 0 1-.73 2.73l-.15.1a2 2 0 0 0-1 1.72v.51a2 2 0 0 0 1 1.74l.15.09a2 2 0 0 1 .73 2.73l-.22.38a2 2 0 0 1-2.73.73l-.15-.08a2 2 0 0 0-2 0l-.43.25a2 2 0 0 0-1 1.73V20a2 2 0 0 1-2 2h-.44a2 2 0 0 1-2-2v-.18a2 2 0 0 0-1-1.73l-.43-.25a2 2 0 0 0-2 0l-.15.08a2 2 0 0 1-2.73-.73l-.22-.39a2 2 0 0 1 .73-2.73l.15-.08a2 2 0 0 0 1-1.74v-.5a2 2 0 0 0-1-1.74l-.15-.09a2 2 0 0 1-.73-2.73l.22-.38a2 2 0 0 1 2.73-.73l.15.08a2 2 0 0 0 2 0l.43-.25a2 2 0 0 0 1-1.73V5a2 2 0 0 1 2-2h.44Zm-.22 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"></path>
                                 </svg>
                                 Configurações
+                            </a>
+                            <a href="{{ route('admin.monitors.index') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                Monitores
                             </a>
                         @endif
                         <form method="POST" action="{{ route('logout') }}">

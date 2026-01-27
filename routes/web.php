@@ -8,6 +8,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardAnalyticsController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SectorController;
 use App\Http\Controllers\Goals\GoalController;
 use App\Http\Controllers\Reports\RankingGeneralController;
 use App\Http\Controllers\Reports\RankingTeamController;
@@ -21,6 +22,11 @@ use Illuminate\Support\Facades\Route;
 
 // Rotas de autenticação (Laravel Breeze)
 require __DIR__.'/auth.php';
+
+// Rota para obter token CSRF atualizado (para evitar erro 419)
+Route::get('/csrf-token', function() {
+    return response()->json(['token' => csrf_token()]);
+})->middleware('web');
 
 // Rotas públicas de monitor
 Route::get('/monitor/{slug}', [MonitorController::class, 'show'])->name('monitor.show');
@@ -42,6 +48,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/analytics', [DashboardAnalyticsController::class, 'index'])->name('dashboard.analytics');
     
     // Sellers
+    Route::get('/sellers/import', [SellerController::class, 'import'])->name('sellers.import');
+    Route::post('/sellers/import', [SellerController::class, 'processImport'])->name('sellers.import.process');
     Route::resource('sellers', SellerController::class);
     
     // Teams
@@ -55,6 +63,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
     Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
     Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
     Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
@@ -105,6 +114,14 @@ Route::middleware('auth')->group(function () {
         Route::patch('/{apiIntegration}/tokens/{apiToken}/toggle-status', [ApiIntegrationController::class, 'toggleTokenStatus'])->name('tokens.toggle-status');
         Route::post('/{apiIntegration}/tokens/{apiToken}/regenerate', [ApiIntegrationController::class, 'regenerateToken'])->name('tokens.regenerate');
     });
+
+    // Setores (apenas admin)
+    Route::get('/sectors', [SectorController::class, 'index'])->name('sectors.index');
+    Route::get('/sectors/create', [SectorController::class, 'create'])->name('sectors.create');
+    Route::post('/sectors', [SectorController::class, 'store'])->name('sectors.store');
+    Route::get('/sectors/{sector}/edit', [SectorController::class, 'edit'])->name('sectors.edit');
+    Route::put('/sectors/{sector}', [SectorController::class, 'update'])->name('sectors.update');
+    Route::patch('/sectors/{sector}/toggle-status', [SectorController::class, 'toggleStatus'])->name('sectors.toggle-status');
 
     // Página de notificações (requer autenticação)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');

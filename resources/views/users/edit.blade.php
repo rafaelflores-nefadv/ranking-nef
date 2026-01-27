@@ -11,9 +11,12 @@
         </div>
 
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
-            <form method="POST" action="{{ route('users.update', $user) }}">
+            <form method="POST" action="{{ route('users.update', $user) }}" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
+
+                <!-- Avatar -->
+                <x-avatar-upload name="avatar" :currentAvatar="$user->avatar" label="Foto de Perfil" />
 
                 <!-- Nome -->
                 <div class="mb-4">
@@ -42,8 +45,25 @@
                         class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="admin" {{ old('role', $user->role ?? '') === 'admin' ? 'selected' : '' }}>Administrador</option>
                         <option value="supervisor" {{ old('role', $user->role ?? '') === 'supervisor' ? 'selected' : '' }}>Supervisor</option>
+                        <option value="user" {{ old('role', $user->role ?? '') === 'user' ? 'selected' : '' }}>Usuário</option>
                     </select>
                     @error('role')
+                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <!-- Setor (supervisor e usuário) -->
+                <div id="sector-section" class="mb-4 {{ in_array(old('role', $user->role ?? ''), ['supervisor', 'user']) ? '' : 'hidden' }}">
+                    <label for="sector_id" class="block text-sm font-medium text-slate-300 mb-2">Setor</label>
+                    <select id="sector_id" name="sector_id" class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Selecione um setor</option>
+                        @foreach($sectors ?? [] as $sector)
+                            <option value="{{ $sector->id }}" {{ old('sector_id', $user->sector_id ?? '') === $sector->id ? 'selected' : '' }}>
+                                {{ $sector->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('sector_id')
                         <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
                     @enderror
                 </div>
@@ -90,10 +110,26 @@
     document.addEventListener('DOMContentLoaded', function() {
         const roleSelect = document.getElementById('role');
         const teamsSection = document.getElementById('teams-section');
+        const sectorSection = document.getElementById('sector-section');
         
-        if (roleSelect && teamsSection) {
+        if (roleSelect) {
             function toggleTeamsSection() {
                 const role = roleSelect.value;
+                if (sectorSection) {
+                    if (role === 'supervisor' || role === 'user') {
+                        sectorSection.classList.remove('hidden');
+                    } else {
+                        sectorSection.classList.add('hidden');
+                        const sectorSelect = sectorSection.querySelector('select');
+                        if (sectorSelect) {
+                            sectorSelect.value = '';
+                        }
+                    }
+                }
+
+                if (!teamsSection) {
+                    return;
+                }
                 if (role === 'supervisor') {
                     teamsSection.classList.remove('hidden');
                     // Tornar obrigatório pelo menos uma equipe

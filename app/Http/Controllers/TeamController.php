@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTeamRequest;
 use App\Http\Requests\UpdateTeamRequest;
+use App\Models\Sector;
 use App\Models\Team;
 use App\Models\Seller;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 
 class TeamController extends Controller
@@ -17,8 +19,12 @@ class TeamController extends Controller
 
         $user = $request->user();
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         $teamsQuery = Team::withCount('sellers');
+        if ($sectorId) {
+            $teamsQuery->where('sector_id', $sectorId);
+        }
         
         // Filtrar equipes baseado no papel do usuário
         if ($allowedTeamIds !== null) {
@@ -34,12 +40,25 @@ class TeamController extends Controller
     {
         $this->authorize('create', Team::class);
 
-        return view('teams.create');
+        $user = request()->user();
+        $sectors = $user && $user->role === 'admin'
+            ? Sector::where('is_active', true)->orderBy('name')->get(['id', 'name'])
+            : collect();
+
+        return view('teams.create', compact('sectors'));
     }
 
     public function store(StoreTeamRequest $request)
     {
-        Team::create($request->validated());
+        $user = $request->user();
+        $sectorId = $user->role === 'admin'
+            ? $request->input('sector_id')
+            : $user->sector_id;
+
+        Team::create(array_merge(
+            $request->validated(),
+            ['sector_id' => $sectorId]
+        ));
 
         return redirect()->route('teams.index')
             ->with('success', 'Equipe criada com sucesso!');
@@ -60,17 +79,22 @@ class TeamController extends Controller
 
         $user = $request->user();
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = $user->role === 'admin'
+            ? $team->sector_id
+            : $user->sector_id;
 
         // Carregar vendedores disponíveis (respeitando permissões)
-        $sellersQuery = Seller::with('team')->orderBy('name');
+        $sellersQuery = Seller::with('teams')->orderBy('name');
+        if ($sectorId) {
+            $sellersQuery->where('sector_id', $sectorId);
+        }
         
         // Filtrar vendedores baseado nas equipes do supervisor
         if ($allowedTeamIds !== null) {
-            // Incluir vendedores das equipes permitidas, sem equipe, ou da equipe atual
-            $sellersQuery->where(function($query) use ($allowedTeamIds, $team) {
-                $query->whereIn('team_id', $allowedTeamIds)
-                      ->orWhereNull('team_id')
-                      ->orWhere('team_id', $team->id); // Sempre incluir vendedores da equipe atual
+            // Incluir vendedores das equipes permitidas ou da equipe atual
+            $sellersQuery->whereHas('teams', function($query) use ($allowedTeamIds, $team) {
+                $query->whereIn('teams.id', $allowedTeamIds)
+                      ->orWhere('teams.id', $team->id); // Sempre incluir vendedores da equipe atual
             });
         }
         
@@ -80,7 +104,15 @@ class TeamController extends Controller
         $team->load('sellers');
         $currentSellerIds = $team->sellers->pluck('id')->toArray();
 
-        return view('teams.edit', compact('team', 'sellers', 'currentSellerIds'));
+        $sectors = collect();
+        if ($user->role === 'admin') {
+            $sectors = Sector::where('is_active', true)
+                ->orWhere('id', $team->sector_id)
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
+        return view('teams.edit', compact('team', 'sellers', 'currentSellerIds', 'sectors'));
     }
 
     public function update(UpdateTeamRequest $request, Team $team)
@@ -92,18 +124,11 @@ class TeamController extends Controller
 
         // Atualizar vendedores da equipe
         if (isset($validated['sellers'])) {
-            // Atualizar team_id dos vendedores selecionados
-            Seller::whereIn('id', $validated['sellers'])
-                ->update(['team_id' => $team->id]);
-            
-            // Remover vendedores que não foram selecionados mas estavam na equipe
-            Seller::where('team_id', $team->id)
-                ->whereNotIn('id', $validated['sellers'])
-                ->update(['team_id' => null]);
+            // Sincronizar vendedores com a equipe usando relação many-to-many
+            $team->sellers()->sync($validated['sellers']);
         } else {
             // Se nenhum vendedor foi selecionado, remover todos da equipe
-            Seller::where('team_id', $team->id)
-                ->update(['team_id' => null]);
+            $team->sellers()->detach();
         }
 
         return redirect()->route('teams.index')

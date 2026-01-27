@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\Sector;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -13,21 +14,26 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        $defaultSectorId = Sector::where('slug', 'geral')->value('id');
+
         $users = [
             [
                 'name' => 'Admin',
                 'email' => 'admin@nef.local',
                 'role' => 'admin',
+                'sector_id' => null,
             ],
             [
                 'name' => 'Supervisor',
                 'email' => 'supervisor@nef.local',
                 'role' => 'supervisor',
+                'sector_id' => $defaultSectorId,
             ],
             [
                 'name' => 'Usuário',
                 'email' => 'user@nef.local',
                 'role' => 'user',
+                'sector_id' => $defaultSectorId,
             ],
         ];
 
@@ -41,6 +47,7 @@ class UserSeeder extends Seeder
                     'name' => $userData['name'],
                     'password' => Hash::make('password'),
                     'role' => $userData['role'],
+                    'sector_id' => $userData['sector_id'],
                 ]
             );
 

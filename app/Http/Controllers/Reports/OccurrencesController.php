@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ApiOccurrence;
 use App\Models\Seller;
 use App\Services\ReportService;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -26,6 +27,7 @@ class OccurrencesController extends Controller
         }
 
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         // Filtros
         $status = $request->query('status'); // pendente, processada, erro
@@ -39,6 +41,9 @@ class OccurrencesController extends Controller
         // Query base
         $query = ApiOccurrence::query()
             ->orderBy('created_at', 'desc');
+        if ($sectorId) {
+            $query->where('sector_id', $sectorId);
+        }
 
         // Filtro por status
         if ($status === 'pendente') {
@@ -59,18 +64,31 @@ class OccurrencesController extends Controller
 
         // Filtrar por equipes permitidas através dos vendedores
         if ($allowedTeamIds !== null) {
-            $sellerEmails = Seller::whereIn('team_id', $allowedTeamIds)
-                ->pluck('email')
-                ->toArray();
-            
-            $query->whereIn('email_funcionario', $sellerEmails);
+            $allowedSellers = Seller::where('sector_id', $sectorId)
+                ->whereHas('teams', function ($q) use ($allowedTeamIds) {
+                    $q->whereIn('teams.id', $allowedTeamIds);
+                })
+                ->get(['email', 'external_code']);
+
+            $emails = $allowedSellers->pluck('email')->filter()->values()->all();
+            $externalCodes = $allowedSellers->pluck('external_code')->filter()->values()->all();
+
+            $query->where(function ($q) use ($emails, $externalCodes) {
+                $q->where(function ($sub) use ($emails) {
+                    $sub->where('collaborator_identifier_type', 'email')
+                        ->whereIn('email_funcionario', $emails);
+                })->orWhere(function ($sub) use ($externalCodes) {
+                    $sub->where('collaborator_identifier_type', 'external_code')
+                        ->whereIn('email_funcionario', $externalCodes);
+                });
+            });
         }
 
         $occurrences = $query->paginate(50);
 
         // Enriquecer com dados adicionais
         $occurrences->getCollection()->transform(function ($occurrence) {
-            $seller = Seller::where('email', $occurrence->email_funcionario)->first();
+            $seller = $occurrence->seller();
             $points = 0;
             
             if ($seller && $occurrence->processed) {

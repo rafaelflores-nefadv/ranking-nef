@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\SpeakRankingJob;
 use App\Models\Config;
+use App\Models\Sector;
 use App\Models\Season;
 use App\Models\Seller;
 use App\Models\Team;
@@ -21,11 +22,7 @@ class RankingVoiceService
         }
 
         $interval = $this->getIntConfig('notifications_voice_interval_minutes', self::DEFAULT_INTERVAL_MINUTES);
-        $lastRunAt = $this->getDateConfig('notifications_voice_last_run_at');
-
-        if ($lastRunAt && now()->diffInMinutes($lastRunAt) < $interval) {
-            return;
-        }
+        $sectors = Sector::where('is_active', true)->get(['id', 'name']);
 
         $season = Season::where('is_active', true)->first();
         if (!$season) {
@@ -37,71 +34,86 @@ class RankingVoiceService
         $onlyWhenChanged = $this->getBoolConfig('notifications_voice_only_when_changed', false);
         $precision = $this->getIntConfig('points_precision', 2);
 
-        $dispatched = false;
+        foreach ($sectors as $sector) {
+            $sectorKey = $sector->id;
+            $lastRunAt = $this->getDateConfig($this->sectorKey('notifications_voice_last_run_at', $sectorKey));
 
-        if (in_array($scope, ['global', 'both'], true)) {
-            $globalTop = $this->getTopSellers($season->id, null);
-            if ($globalTop->isNotEmpty()) {
-                $hash = $this->hashRanking($globalTop);
-                $lastHash = $this->getStringConfig('notifications_voice_last_hash_global', '');
+            if ($lastRunAt && now()->diffInMinutes($lastRunAt) < $interval) {
+                continue;
+            }
 
-                if (!$onlyWhenChanged || $hash !== $lastHash) {
+            $dispatched = false;
+
+            if (in_array($scope, ['global', 'both'], true)) {
+                $globalTop = $this->getTopSellers($season->id, null, $sectorKey);
+                if ($globalTop->isNotEmpty()) {
+                    $hash = $this->hashRanking($globalTop);
+                    $lastHash = $this->getStringConfig($this->sectorKey('notifications_voice_last_hash_global', $sectorKey), '');
+
+                    if (!$onlyWhenChanged || $hash !== $lastHash) {
+                        $content = $this->buildRankingText(
+                            'Top 3 do ranking geral:',
+                            $globalTop->all(),
+                            $precision
+                        );
+                        SpeakRankingJob::dispatch('global', $content, $sectorKey);
+                        $this->setConfig($this->sectorKey('notifications_voice_last_hash_global', $sectorKey), $hash);
+                        $dispatched = true;
+                    }
+                }
+            }
+
+            if (in_array($scope, ['teams', 'both'], true)) {
+                $lastHashes = $this->getJsonConfig($this->sectorKey('notifications_voice_last_hash_teams', $sectorKey));
+                $teams = Team::where('sector_id', $sectorKey)->orderBy('name')->get(['id', 'name']);
+
+                foreach ($teams as $team) {
+                    $teamTop = $this->getTopSellers($season->id, $team->id, $sectorKey);
+                    if ($teamTop->isEmpty()) {
+                        continue;
+                    }
+
+                    $hash = $this->hashRanking($teamTop);
+                    $previousHash = $lastHashes[$team->id] ?? '';
+
+                    if ($onlyWhenChanged && $hash === $previousHash) {
+                        continue;
+                    }
+
                     $content = $this->buildRankingText(
-                        'Top 3 do ranking geral:',
-                        $globalTop->all(),
+                        "Top 3 da equipe {$team->name}:",
+                        $teamTop->all(),
                         $precision
                     );
-                    SpeakRankingJob::dispatch('global', $content);
-                    $this->setConfig('notifications_voice_last_hash_global', $hash);
+                    SpeakRankingJob::dispatch('team', $content, $sectorKey);
+                    $lastHashes[$team->id] = $hash;
                     $dispatched = true;
                 }
-            }
-        }
 
-        if (in_array($scope, ['teams', 'both'], true)) {
-            $lastHashes = $this->getJsonConfig('notifications_voice_last_hash_teams');
-            $teams = Team::orderBy('name')->get(['id', 'name']);
-
-            foreach ($teams as $team) {
-                $teamTop = $this->getTopSellers($season->id, $team->id);
-                if ($teamTop->isEmpty()) {
-                    continue;
-                }
-
-                $hash = $this->hashRanking($teamTop);
-                $previousHash = $lastHashes[$team->id] ?? '';
-
-                if ($onlyWhenChanged && $hash === $previousHash) {
-                    continue;
-                }
-
-                $content = $this->buildRankingText(
-                    "Top 3 da equipe {$team->name}:",
-                    $teamTop->all(),
-                    $precision
-                );
-                SpeakRankingJob::dispatch('team', $content);
-                $lastHashes[$team->id] = $hash;
-                $dispatched = true;
+                $this->setConfig($this->sectorKey('notifications_voice_last_hash_teams', $sectorKey), json_encode($lastHashes));
             }
 
-            $this->setConfig('notifications_voice_last_hash_teams', json_encode($lastHashes));
-        }
-
-        if ($dispatched) {
-            $this->setConfig('notifications_voice_last_run_at', now()->toIso8601String());
+            if ($dispatched) {
+                $this->setConfig($this->sectorKey('notifications_voice_last_run_at', $sectorKey), now()->toIso8601String());
+            }
         }
     }
 
-    private function getTopSellers(string $seasonId, ?string $teamId)
+    private function getTopSellers(string $seasonId, ?string $teamId, ?string $sectorId)
     {
         $query = Seller::query()
             ->where('season_id', $seasonId)
             ->orderBy('points', 'desc')
             ->limit(3);
 
+        if ($sectorId) {
+            $query->where('sector_id', $sectorId);
+        }
+
         if ($teamId) {
-            $query->where('team_id', $teamId);
+            $query->whereHas('teams', function ($q) use ($teamId) {
+                $q->where('teams.id', $teamId);
+            });
         }
 
         return $query->get(['id', 'name', 'points']);
@@ -196,5 +208,10 @@ class RankingVoiceService
             ['key' => $key],
             ['value' => $value]
         );
+    }
+
+    private function sectorKey(string $baseKey, string $sectorId): string
+    {
+        return "{$baseKey}_{$sectorId}";
     }
 }

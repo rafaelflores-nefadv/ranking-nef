@@ -12,9 +12,14 @@
                 <p class="text-slate-400">Gerencie os Vendedores do sistema</p>
             </div>
             @can('create', App\Models\Seller::class)
-            <a href="{{ route('sellers.create') }}" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
-                Novo Vendedor
-            </a>
+            <div class="flex items-center gap-3">
+                <a href="{{ route('sellers.import') }}" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+                    Importar Vendedores
+                </a>
+                <a href="{{ route('sellers.create') }}" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
+                    Novo Vendedor
+                </a>
+            </div>
             @endcan
         </div>
 
@@ -37,8 +42,10 @@
                 <table class="w-full">
                     <thead class="bg-slate-800/50">
                         <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Foto</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Nome</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Código Externo</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Pontos</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Equipe</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
@@ -49,10 +56,20 @@
                         @forelse($sellers as $seller)
                         <tr class="hover:bg-slate-800/30">
                             <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <img src="{{ $seller->avatar ? asset('storage/' . $seller->avatar) : 'https://ui-avatars.com/api/?name=' . urlencode($seller->name) . '&background=6366f1&color=fff&size=64' }}" 
+                                         alt="{{ $seller->name }}" 
+                                         class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-white font-medium">{{ $seller->name }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-slate-400">{{ $seller->email }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-slate-400">{{ $seller->external_code ?? '—' }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="text-white font-bold">{{ number_format($seller->points, 0, ',', '.') }}</span>
@@ -98,7 +115,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-400">
+                            <td colspan="8" class="px-6 py-8 text-center text-slate-400">
                                 Nenhum vendedor encontrado
                             </td>
                         </tr>

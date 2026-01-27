@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Seller;
 use App\Models\User;
 use App\Services\PermissionService;
+use App\Services\SectorService;
 
 class SellerPolicy
 {
@@ -38,7 +39,7 @@ class SellerPolicy
     {
         // user pode ver todos
         if ($user->role === 'user') {
-            return true;
+            return $this->isInUserSector($user, $seller);
         }
         
         // admin pode ver todos
@@ -49,7 +50,10 @@ class SellerPolicy
         // supervisor só pode ver vendedores das suas equipes
         if ($user->role === 'supervisor') {
             $allowedTeamIds = $user->getSupervisedTeamIds();
-            return in_array($seller->team_id, $allowedTeamIds);
+            if (!$this->isInUserSector($user, $seller)) {
+                return false;
+            }
+            return $seller->teams->pluck('id')->intersect($allowedTeamIds)->isNotEmpty();
         }
         
         return false;
@@ -91,7 +95,10 @@ class SellerPolicy
             
             // Verificar se o vendedor pertence a uma equipe do supervisor
             $allowedTeamIds = $user->getSupervisedTeamIds();
-            return in_array($seller->team_id, $allowedTeamIds);
+            if (!$this->isInUserSector($user, $seller)) {
+                return false;
+            }
+            return $seller->teams->pluck('id')->intersect($allowedTeamIds)->isNotEmpty();
         }
         
         return false;
@@ -115,9 +122,22 @@ class SellerPolicy
             
             // Verificar se o vendedor pertence a uma equipe do supervisor
             $allowedTeamIds = $user->getSupervisedTeamIds();
-            return in_array($seller->team_id, $allowedTeamIds);
+            if (!$this->isInUserSector($user, $seller)) {
+                return false;
+            }
+            return $seller->teams->pluck('id')->intersect($allowedTeamIds)->isNotEmpty();
         }
 
         return false;
+    }
+
+    private function isInUserSector(User $user, Seller $seller): bool
+    {
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        $sectorId = $user->sector_id ?? app(SectorService::class)->getDefaultSectorId();
+        return $seller->sector_id === $sectorId;
     }
 }

@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Services\SectorService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreUserRequest extends FormRequest
 {
@@ -22,9 +24,13 @@ class StoreUserRequest extends FormRequest
      */
     public function rules(): array
     {
+        $sectorId = $this->input('sector_id') ?: app(SectorService::class)->getDefaultSectorId();
+
         $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'avatar_base64' => 'nullable|string',
             'password' => [
                 'required',
                 'min:8',
@@ -34,14 +40,20 @@ class StoreUserRequest extends FormRequest
                 'regex:/[0-9]/',      // Pelo menos um número
                 'regex:/[!@#$%^&*(),.?":{}|<>]/', // Pelo menos um caractere especial
             ],
-            'role' => 'required|in:admin,supervisor',
+            'role' => 'required|in:admin,supervisor,user',
+            'sector_id' => 'nullable|uuid|exists:sectors,id',
             'teams' => 'nullable|array',
-            'teams.*' => 'exists:teams,id',
+            'teams.*' => Rule::exists('teams', 'id')->where('sector_id', $sectorId),
         ];
 
         // Se for supervisor, validar equipes (obrigatório pelo menos uma)
         if ($this->input('role') === 'supervisor') {
             $rules['teams'] = 'required|array|min:1';
+            $rules['sector_id'] = 'required|uuid|exists:sectors,id';
+        }
+
+        if ($this->input('role') === 'user') {
+            $rules['sector_id'] = 'required|uuid|exists:sectors,id';
         }
 
         return $rules;
@@ -66,6 +78,8 @@ class StoreUserRequest extends FormRequest
             'password.regex' => 'A senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial.',
             'role.required' => 'O perfil é obrigatório.',
             'role.in' => 'O perfil selecionado é inválido.',
+            'sector_id.required' => 'Selecione um setor.',
+            'sector_id.exists' => 'O setor selecionado é inválido.',
             'teams.required' => 'Selecione pelo menos uma equipe para o supervisor.',
             'teams.array' => 'As equipes devem ser um array.',
             'teams.min' => 'Selecione pelo menos uma equipe para o supervisor.',

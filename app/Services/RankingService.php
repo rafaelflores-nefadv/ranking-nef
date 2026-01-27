@@ -23,6 +23,7 @@ class RankingService
      * @param Carbon|null $endDate Data de fim
      * @param string|null $teamId ID da equipe (opcional)
      * @param int|null $limit Limite de posições
+     * @param string|null $sectorId Setor atual
      * @return Collection
      */
     public function getGeneralRanking(
@@ -31,20 +32,34 @@ class RankingService
         ?Carbon $startDate = null,
         ?Carbon $endDate = null,
         ?string $teamId = null,
-        ?int $limit = null
+        ?int $limit = null,
+        ?string $sectorId = null
     ): Collection {
-        $query = Seller::with(['team', 'season']);
-
-        // Filtro de equipes permitidas
-        $this->reportService->filterTeamsByUser($query, $allowedTeamIds);
+        $query = Seller::with(['teams', 'season']);
+        if ($sectorId) {
+            $query->where('sector_id', $sectorId);
+        }
 
         // Filtro por equipe específica
         if ($teamId) {
             // Verificar se a equipe está nas permitidas
             if ($allowedTeamIds === null || in_array($teamId, $allowedTeamIds)) {
-                $query->where('team_id', $teamId);
+                $query->whereHas('teams', function ($q) use ($teamId) {
+                    $q->where('teams.id', $teamId);
+                });
+            } else {
+                // Se não tem permissão, não retornar vendedores
+                $query->whereRaw('1 = 0');
             }
+        } elseif ($allowedTeamIds !== null) {
+            // Geral: incluir vendedores das equipes permitidas OU vendedores sem equipe
+            $query->where(function($q) use ($allowedTeamIds) {
+                $q->whereHas('teams', function ($teamQuery) use ($allowedTeamIds) {
+                    $teamQuery->whereIn('teams.id', $allowedTeamIds);
+                })->orWhereDoesntHave('teams');
+            });
         }
+        // Se $teamId é null e $allowedTeamIds é null, mostrar todos (sem filtro adicional)
 
         // Filtro por temporada
         if ($seasonId) {
@@ -77,7 +92,8 @@ class RankingService
                 $previousStartDate,
                 $previousEndDate,
                 $teamId,
-                null
+                null,
+                $sectorId
             );
 
             $previousPositions = $previousRanking->pluck('position', 'seller_id')->toArray();
@@ -118,11 +134,13 @@ class RankingService
      *
      * @param array|null $allowedTeamIds IDs de equipes permitidas (null = todas)
      * @param string|null $seasonId ID da temporada
+     * @param string|null $sectorId Setor atual
      * @return Collection
      */
     public function getTeamRanking(
         ?array $allowedTeamIds = null,
-        ?string $seasonId = null
+        ?string $seasonId = null,
+        ?string $sectorId = null
     ): Collection {
         $query = Team::with(['sellers' => function ($q) use ($seasonId) {
             if ($seasonId) {
@@ -130,6 +148,9 @@ class RankingService
             }
             $q->orderBy('points', 'desc');
         }]);
+        if ($sectorId) {
+            $query->where('sector_id', $sectorId);
+        }
 
         // Filtro de equipes permitidas
         if ($allowedTeamIds !== null) {

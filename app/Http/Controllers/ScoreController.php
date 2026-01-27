@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Score;
+use App\Services\SectorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -21,11 +22,15 @@ class ScoreController extends Controller
 
         $limit = $validated['limit'] ?? 10;
         $since = isset($validated['since']) ? Carbon::parse($validated['since']) : null;
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         $query = Score::with([
             'seller:id,name',
-            'scoreRule:id,ocorrencia,description',
+            'scoreRule:id,ocorrencia',
         ])->orderBy('created_at', 'desc');
+        if ($sectorId) {
+            $query->where('sector_id', $sectorId);
+        }
 
         if ($since) {
             $query->where('created_at', '>', $since);
@@ -46,7 +51,6 @@ class ScoreController extends Controller
                     'occurrence' => [
                         'id' => $score->scoreRule?->id,
                         'type' => $score->scoreRule?->ocorrencia,
-                        'description' => $score->scoreRule?->description,
                     ],
                 ];
             }),

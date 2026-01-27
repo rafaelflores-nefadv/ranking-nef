@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Config;
 use App\Models\Monitor;
+use App\Models\Season;
 use App\Models\Seller;
 use App\Models\Team;
 use App\Services\GamificationService;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 
 class MonitorController extends Controller
@@ -39,9 +41,14 @@ class MonitorController extends Controller
             'voice_enabled_type' => gettype($settings['voice_enabled'] ?? null),
         ]);
         
+        $sectorId = $monitor->sector_id ?? app(SectorService::class)->getDefaultSectorId();
+
         // Obter dados do dashboard (sem filtro de usuário - público)
-        $data = $this->buildDashboardData(null, null);
+        $data = $this->buildDashboardData(null, null, $sectorId);
         $configs = Config::all()->pluck('value', 'key');
+        
+        // Buscar temporada ativa
+        $activeSeason = \App\Models\Season::where('is_active', true)->first();
         
         // Normalizar configuração de eventos de notificação
         $notificationEventsConfig = $this->normalizeNotificationEventsConfig(
@@ -92,6 +99,7 @@ class MonitorController extends Controller
             'notificationEventsConfig' => $notificationEventsConfig,
             'monitor' => $monitor,
             'dashboardConfig' => $dashboardConfig,
+            'activeSeason' => $activeSeason,
         ]));
     }
 
@@ -118,6 +126,7 @@ class MonitorController extends Controller
         if (!$season) {
             return response()->json(['error' => 'Nenhuma temporada ativa'], 404);
         }
+        $sectorId = $monitor->sector_id ?? app(SectorService::class)->getDefaultSectorId();
 
         $precision = (int)(\App\Models\Config::where('key', 'points_precision')->value('value') ?? 2);
         $voiceScope = \App\Models\Config::where('key', 'notifications_voice_scope')->value('value') ?? 'global';
@@ -128,6 +137,7 @@ class MonitorController extends Controller
         if (in_array($voiceScope, ['global', 'both'], true)) {
             $globalTop = \App\Models\Seller::query()
                 ->where('season_id', $season->id)
+                ->where('sector_id', $sectorId)
                 ->orderBy('points', 'desc')
                 ->limit(3)
                 ->get(['id', 'name', 'points']);
@@ -151,7 +161,7 @@ class MonitorController extends Controller
                 $allowedTeamIds = $settings['teams'];
             }
             
-            $teamsQuery = \App\Models\Team::orderBy('name');
+            $teamsQuery = \App\Models\Team::where('sector_id', $sectorId)->orderBy('name');
             if ($allowedTeamIds !== null) {
                 $teamsQuery->whereIn('id', $allowedTeamIds);
             }
@@ -160,7 +170,10 @@ class MonitorController extends Controller
             foreach ($teams as $team) {
                 $teamTop = \App\Models\Seller::query()
                     ->where('season_id', $season->id)
-                    ->where('team_id', $team->id)
+                    ->where('sector_id', $sectorId)
+                    ->whereHas('teams', function($query) use ($team) {
+                        $query->where('teams.id', $team->id);
+                    })
                     ->orderBy('points', 'desc')
                     ->limit(3)
                     ->get(['id', 'name', 'points']);
@@ -203,6 +216,7 @@ class MonitorController extends Controller
 
         $settings = $monitor->getMergedSettings();
         $teamId = $request->query('team');
+        $sectorId = $monitor->sector_id ?? app(SectorService::class)->getDefaultSectorId();
 
         // Se o monitor tem equipes configuradas, usar apenas essas
         $allowedTeamIds = null;
@@ -214,7 +228,7 @@ class MonitorController extends Controller
             }
         }
 
-        $data = $this->buildDashboardData($teamId, $allowedTeamIds);
+        $data = $this->buildDashboardData($teamId, $allowedTeamIds, $sectorId);
 
         return response()->json([
             'activeTeamName' => $data['activeTeam']?->name,
@@ -236,10 +250,13 @@ class MonitorController extends Controller
     /**
      * Constrói dados do dashboard (reutilizado do DashboardController)
      */
-    private function buildDashboardData(?string $teamId, ?array $allowedTeamIds = null): array
+    private function buildDashboardData(?string $teamId, ?array $allowedTeamIds = null, ?string $sectorId = null): array
     {
         // Filtrar equipes
         $teamsQuery = Team::orderBy('name');
+        if ($sectorId) {
+            $teamsQuery->where('sector_id', $sectorId);
+        }
         if ($allowedTeamIds !== null) {
             $teamsQuery->whereIn('id', $allowedTeamIds);
         }
@@ -247,18 +264,38 @@ class MonitorController extends Controller
         
         $activeTeam = $teamId ? $teams->firstWhere('id', $teamId) : null;
 
-        $sellersQuery = Seller::with(['team', 'season']);
+        // Buscar temporada ativa
+        $activeSeason = Season::where('is_active', true)->first();
+
+        $sellersQuery = Seller::with(['teams', 'season']);
+        if ($sectorId) {
+            $sellersQuery->where('sector_id', $sectorId);
+        }
+        
+        // Filtrar por temporada ativa (apenas vendedores da temporada atual)
+        if ($activeSeason) {
+            $sellersQuery->where('season_id', $activeSeason->id);
+        }
         
         // Filtrar por equipe selecionada ou equipes permitidas
         if ($teamId) {
+            // Filtro por equipe específica
             if ($allowedTeamIds === null || in_array($teamId, $allowedTeamIds)) {
-                $sellersQuery->where('team_id', $teamId);
+                $sellersQuery->whereHas('teams', function($query) use ($teamId) {
+                    $query->where('teams.id', $teamId);
+                });
             } else {
                 $sellersQuery->whereRaw('1 = 0');
             }
         } elseif ($allowedTeamIds !== null) {
-            $sellersQuery->whereIn('team_id', $allowedTeamIds);
+            // Geral: mostrar vendedores das equipes permitidas OU vendedores sem equipe
+            $sellersQuery->where(function($query) use ($allowedTeamIds) {
+                $query->whereHas('teams', function($q) use ($allowedTeamIds) {
+                    $q->whereIn('teams.id', $allowedTeamIds);
+                })->orWhereDoesntHave('teams');
+            });
         }
+        // Se $teamId é null e $allowedTeamIds é null, mostrar todos (sem filtro adicional)
 
         $sellers = $sellersQuery
             ->orderBy('points', 'desc')
@@ -276,7 +313,7 @@ class MonitorController extends Controller
                 'badge' => $gamification['badge'],
                 'progress' => $gamification['progress'],
                 'position' => 0,
-                'team' => $seller->team?->name,
+                'team' => $seller->teams->first()?->name,
                 'season' => $seller->season?->name,
             ];
         })->values();

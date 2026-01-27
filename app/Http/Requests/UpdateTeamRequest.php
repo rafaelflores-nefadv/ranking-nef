@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\SectorService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,11 +25,23 @@ class UpdateTeamRequest extends FormRequest
     public function rules(): array
     {
         $team = $this->route('team');
+        $user = $this->user();
+        $sectorId = $user && $user->role === 'admin'
+            ? ($this->input('sector_id') ?: $team->sector_id)
+            : ($user?->sector_id ?? app(SectorService::class)->getDefaultSectorId());
         
         return [
-            'name' => ['required', 'string', 'max:255', Rule::unique('teams')->ignore($team->id)],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('teams', 'name')->where('sector_id', $sectorId)->ignore($team->id),
+            ],
+            'sector_id' => $user && $user->role === 'admin'
+                ? ['required', 'uuid', Rule::in([$team->sector_id])]
+                : 'prohibited',
             'sellers' => ['nullable', 'array'],
-            'sellers.*' => ['exists:sellers,id'],
+            'sellers.*' => [Rule::exists('sellers', 'id')->where('sector_id', $sectorId)],
         ];
     }
 
@@ -43,6 +56,9 @@ class UpdateTeamRequest extends FormRequest
             'name.required' => 'O nome da equipe é obrigatório.',
             'name.max' => 'O nome da equipe não pode ter mais de 255 caracteres.',
             'name.unique' => 'Já existe uma equipe com este nome.',
+            'sector_id.required' => 'Selecione um setor.',
+            'sector_id.in' => 'A equipe não pertence ao setor selecionado.',
+            'sellers.*.exists' => 'Um dos vendedores selecionados não pertence ao setor selecionado.',
         ];
     }
 }

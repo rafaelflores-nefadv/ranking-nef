@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\SectorService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,18 +25,27 @@ class UpdateUserRequest extends FormRequest
     public function rules(): array
     {
         $user = $this->route('user');
+        $sectorId = $this->input('sector_id') ?: app(SectorService::class)->getDefaultSectorId();
         
         $rules = [
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'role' => 'required|in:admin,supervisor',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'avatar_base64' => 'nullable|string',
+            'role' => 'required|in:admin,supervisor,user',
+            'sector_id' => 'nullable|uuid|exists:sectors,id',
             'teams' => 'nullable|array',
-            'teams.*' => 'exists:teams,id',
+            'teams.*' => Rule::exists('teams', 'id')->where('sector_id', $sectorId),
         ];
 
         // Se for supervisor, validar equipes (obrigatório pelo menos uma)
         if ($this->input('role') === 'supervisor') {
             $rules['teams'] = 'required|array|min:1';
+            $rules['sector_id'] = 'required|uuid|exists:sectors,id';
+        }
+
+        if ($this->input('role') === 'user') {
+            $rules['sector_id'] = 'required|uuid|exists:sectors,id';
         }
 
         return $rules;
@@ -56,6 +66,8 @@ class UpdateUserRequest extends FormRequest
             'email.unique' => 'Este email já está em uso.',
             'role.required' => 'O perfil é obrigatório.',
             'role.in' => 'O perfil selecionado é inválido.',
+            'sector_id.required' => 'Selecione um setor.',
+            'sector_id.exists' => 'O setor selecionado é inválido.',
             'teams.required' => 'Selecione pelo menos uma equipe para o supervisor.',
             'teams.array' => 'As equipes devem ser um array.',
             'teams.min' => 'Selecione pelo menos uma equipe para o supervisor.',

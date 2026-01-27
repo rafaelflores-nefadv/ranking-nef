@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Reports;
 use App\Http\Controllers\Controller;
 use App\Models\Seller;
 use App\Services\GamificationService;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 
 class GamificationController extends Controller
@@ -24,13 +25,19 @@ class GamificationController extends Controller
         }
 
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         // Query base
-        $query = Seller::with(['team', 'season']);
+        $query = Seller::with(['teams', 'season']);
+        if ($sectorId) {
+            $query->where('sector_id', $sectorId);
+        }
 
         // Filtrar por equipes permitidas
         if ($allowedTeamIds !== null) {
-            $query->whereIn('team_id', $allowedTeamIds);
+            $query->whereHas('teams', function ($q) use ($allowedTeamIds) {
+                $q->whereIn('teams.id', $allowedTeamIds);
+            });
         }
 
         // Ordenar por pontos

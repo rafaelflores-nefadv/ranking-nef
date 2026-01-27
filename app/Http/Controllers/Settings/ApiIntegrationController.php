@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\ApiIntegration;
 use App\Models\ApiToken;
+use App\Models\Sector;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class ApiIntegrationController extends Controller
 {
@@ -21,7 +23,7 @@ class ApiIntegrationController extends Controller
             abort(403, 'Acesso negado');
         }
 
-        $integrations = ApiIntegration::with('tokens')
+        $integrations = ApiIntegration::with(['tokens', 'sector'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -39,7 +41,9 @@ class ApiIntegrationController extends Controller
             abort(403, 'Acesso negado');
         }
 
-        return view('settings.api.create');
+        $sectors = Sector::where('is_active', true)->orderBy('name')->get();
+
+        return view('settings.api.create', compact('sectors'));
     }
 
     /**
@@ -54,6 +58,7 @@ class ApiIntegrationController extends Controller
         }
 
         $validated = $request->validate([
+            'sector_id' => 'required|uuid|exists:sectors,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'system' => 'nullable|string|max:255',
@@ -61,6 +66,7 @@ class ApiIntegrationController extends Controller
         ]);
 
         $integration = ApiIntegration::create([
+            'sector_id' => $validated['sector_id'],
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'system' => $validated['system'] ?? null,
@@ -83,9 +89,10 @@ class ApiIntegrationController extends Controller
             abort(403, 'Acesso negado');
         }
 
-        $apiIntegration->load('tokens');
+        $apiIntegration->load('tokens.sector', 'sector');
+        $sectors = Sector::where('is_active', true)->orderBy('name')->get();
 
-        return view('settings.api.edit', compact('apiIntegration'));
+        return view('settings.api.edit', compact('apiIntegration', 'sectors'));
     }
 
     /**
@@ -100,6 +107,7 @@ class ApiIntegrationController extends Controller
         }
 
         $validated = $request->validate([
+            'sector_id' => ['required', 'uuid', Rule::exists('sectors', 'id')->where('is_active', true)],
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'system' => 'nullable|string|max:255',
@@ -107,11 +115,15 @@ class ApiIntegrationController extends Controller
         ]);
 
         $apiIntegration->update([
+            'sector_id' => $validated['sector_id'],
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'system' => $validated['system'] ?? null,
             'is_active' => $request->boolean('is_active', true),
         ]);
+
+        ApiToken::where('integration_id', $apiIntegration->id)
+            ->update(['sector_id' => $validated['sector_id']]);
 
         return redirect()
             ->route('settings.api.index')
@@ -147,10 +159,22 @@ class ApiIntegrationController extends Controller
             abort(403, 'Acesso negado');
         }
 
+        $validated = $request->validate([
+            'collaborator_identifier_type' => 'required|in:email,external_code',
+        ]);
+
+        if (!$apiIntegration->sector_id) {
+            return redirect()
+                ->route('settings.api.edit', $apiIntegration)
+                ->with('error', 'Defina o setor da integração antes de gerar tokens.');
+        }
+
         $generated = ApiToken::generate();
         
         $token = new ApiToken();
         $token->integration_id = $apiIntegration->id;
+        $token->sector_id = $apiIntegration->sector_id;
+        $token->collaborator_identifier_type = $validated['collaborator_identifier_type'];
         $token->token = $generated['token'];
         $token->setSecretHashFromPlainSecret($generated['secret']);
         $token->is_active = true;
@@ -216,6 +240,8 @@ class ApiIntegrationController extends Controller
         
         $newToken = new ApiToken();
         $newToken->integration_id = $apiIntegration->id;
+        $newToken->sector_id = $apiIntegration->sector_id;
+        $newToken->collaborator_identifier_type = $apiToken->collaborator_identifier_type;
         $newToken->token = $generated['token'];
         $newToken->setSecretHashFromPlainSecret($generated['secret']);
         $newToken->is_active = true;

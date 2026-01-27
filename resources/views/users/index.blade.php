@@ -44,9 +44,11 @@
                 <table class="w-full">
                     <thead class="bg-slate-800/50">
                         <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Foto</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Nome</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Email</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Perfil</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Setor</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Ações</th>
                         </tr>
@@ -55,15 +57,25 @@
                         @forelse($users as $user)
                         <tr class="hover:bg-slate-800/30">
                             <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <img src="{{ $user->avatar ? asset('storage/' . $user->avatar) : 'https://ui-avatars.com/api/?name=' . urlencode($user->name) . '&background=6366f1&color=fff&size=64' }}" 
+                                         alt="{{ $user->name }}" 
+                                         class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-white font-medium">{{ $user->name }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-slate-400">{{ $user->email }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $user->role === 'admin' ? 'bg-purple-600/20 text-purple-400' : 'bg-blue-600/20 text-blue-400' }}">
-                                    {{ $user->role === 'admin' ? 'Administrador' : 'Supervisor' }}
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $user->role === 'admin' ? 'bg-purple-600/20 text-purple-400' : ($user->role === 'supervisor' ? 'bg-blue-600/20 text-blue-400' : 'bg-slate-600/20 text-slate-300') }}">
+                                    {{ $user->role === 'admin' ? 'Administrador' : ($user->role === 'supervisor' ? 'Supervisor' : 'Usuário') }}
                                 </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-slate-400">{{ $user->sector?->name ?? '—' }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $user->is_active ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400' }}">
@@ -73,6 +85,12 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 <div class="flex items-center gap-3">
                                     @if(auth()->user() && auth()->user()->role === 'admin')
+                                    <a href="{{ route('users.show', $user) }}" class="text-blue-400 hover:text-blue-300 transition-colors" title="Ver usuário">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </a>
                                     <a href="{{ route('users.edit', $user) }}" class="text-yellow-400 hover:text-yellow-300 transition-colors" title="Editar usuário">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -113,7 +131,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-8 text-center text-slate-400">
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-400">
                                 Nenhum usuário encontrado
                             </td>
                         </tr>

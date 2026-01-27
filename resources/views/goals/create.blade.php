@@ -14,6 +14,30 @@
             <form method="POST" action="{{ route('goals.store') }}" id="goalForm">
                 @csrf
 
+                @php
+                    $user = auth()->user();
+                    $isAdmin = $user && $user->role === 'admin';
+                @endphp
+
+                @if($isAdmin)
+                    <!-- Setor -->
+                    <div class="mb-4">
+                        <label for="sector_id" class="block text-sm font-medium text-slate-300 mb-2">Setor</label>
+                        <select id="sector_id" name="sector_id" required
+                            class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Selecione um setor</option>
+                            @foreach($sectors ?? [] as $sector)
+                                <option value="{{ $sector->id }}" {{ old('sector_id') == $sector->id ? 'selected' : '' }}>
+                                    {{ $sector->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('sector_id')
+                            <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+                @endif
+
                 <!-- Escopo -->
                 <div class="mb-4">
                     <label for="scope" class="block text-sm font-medium text-slate-300 mb-2">Escopo da Meta</label>
@@ -53,7 +77,7 @@
                         class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Selecione uma equipe</option>
                         @foreach($teams as $team)
-                            <option value="{{ $team->id }}" {{ old('team_id') == $team->id ? 'selected' : '' }}>
+                            <option value="{{ $team->id }}" data-sector-id="{{ $team->sector_id }}" {{ old('team_id') == $team->id ? 'selected' : '' }}>
                                 {{ $team->name }}
                             </option>
                         @endforeach
@@ -78,7 +102,7 @@
                         class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Selecione um vendedor</option>
                         @foreach($sellers as $seller)
-                            <option value="{{ $seller->id }}" {{ old('seller_id') == $seller->id ? 'selected' : '' }}>
+                            <option value="{{ $seller->id }}" data-sector-id="{{ $seller->sector_id }}" {{ old('seller_id') == $seller->id ? 'selected' : '' }}>
                                 {{ $seller->name }} ({{ $seller->team->name ?? 'Sem equipe' }})
                             </option>
                         @endforeach
@@ -157,14 +181,33 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const sectorSelect = document.getElementById('sector_id');
     const scopeSelect = document.getElementById('scope');
     const teamField = document.getElementById('team-field');
     const sellerField = document.getElementById('seller-field');
     const createForAllSellers = document.getElementById('create-for-all-sellers');
     const teamIdSelect = document.getElementById('team_id');
     const sellerIdSelect = document.getElementById('seller_id');
+    const isAdmin = !!sectorSelect;
+
+    function filterOptions(select, sectorId) {
+        if (!select) return;
+        Array.from(select.options).forEach((option) => {
+            if (!option.value) {
+                option.hidden = false;
+                return;
+            }
+            const optionSector = option.dataset.sectorId;
+            option.hidden = !sectorId || optionSector !== sectorId;
+        });
+        if (select.value && select.options[select.selectedIndex]?.hidden) {
+            select.value = '';
+        }
+    }
 
     function updateFields() {
+        const sectorId = sectorSelect ? sectorSelect.value : '';
+        const sectorEnabled = !isAdmin || !!sectorId;
         const scope = scopeSelect.value;
         
         // Esconder todos os campos
@@ -175,6 +218,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Limpar valores
         teamIdSelect.required = false;
         sellerIdSelect.required = false;
+        teamIdSelect.disabled = !sectorEnabled;
+        sellerIdSelect.disabled = !sectorEnabled;
+
+        if (!sectorEnabled) {
+            return;
+        }
         
         // Mostrar campos conforme o escopo
         if (scope === 'team') {
@@ -187,8 +236,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function updateSectorState() {
+        const sectorId = sectorSelect ? sectorSelect.value : '';
+        const enableScope = !isAdmin || !!sectorId;
+
+        if (isAdmin) {
+            filterOptions(teamIdSelect, sectorId);
+            filterOptions(sellerIdSelect, sectorId);
+        }
+
+        scopeSelect.disabled = !enableScope;
+        scopeSelect.classList.toggle('opacity-50', !enableScope);
+        scopeSelect.classList.toggle('cursor-not-allowed', !enableScope);
+        if (!enableScope) {
+            scopeSelect.value = '';
+            teamIdSelect.value = '';
+            sellerIdSelect.value = '';
+        }
+
+        updateFields();
+    }
+
     scopeSelect.addEventListener('change', updateFields);
-    updateFields(); // Inicializar campos
+
+    if (sectorSelect) {
+        sectorSelect.addEventListener('change', updateSectorState);
+    }
+
+    updateSectorState(); // Inicializar campos
 });
 </script>
 @endsection

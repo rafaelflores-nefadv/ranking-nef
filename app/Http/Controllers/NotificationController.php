@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\NotificationHistory;
 use App\Models\Score;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -23,11 +24,13 @@ class NotificationController extends Controller
         $endDate = isset($validated['end_date'])
             ? Carbon::parse($validated['end_date'])->endOfDay()
             : null;
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         $notifications = Score::with([
             'seller:id,name',
-            'scoreRule:id,ocorrencia,description',
+            'scoreRule:id,ocorrencia',
         ])
+            ->when($sectorId, fn ($query) => $query->where('sector_id', $sectorId))
             ->when($startDate, fn ($query) => $query->where('created_at', '>=', $startDate))
             ->when($endDate, fn ($query) => $query->where('created_at', '<=', $endDate))
             ->orderBy('created_at', 'desc')
@@ -49,9 +52,13 @@ class NotificationController extends Controller
 
         $limit = $validated['limit'] ?? 10;
         $since = isset($validated['since']) ? Carbon::parse($validated['since']) : null;
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         $query = NotificationHistory::where('type', 'voice_ranking')
             ->orderBy('created_at', 'desc');
+        if ($sectorId) {
+            $query->where('sector_id', $sectorId);
+        }
 
         if ($since) {
             $query->where('created_at', '>', $since);

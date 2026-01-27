@@ -6,6 +6,7 @@ use App\Models\ApiOccurrence;
 use App\Models\Score;
 use App\Models\ScoreRule;
 use App\Models\Seller;
+use App\Models\Sector;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -44,13 +45,14 @@ class SimulateSaleCommand extends Command
         $customPoints = $this->option('points');
         $credor = $this->option('credor');
         $equipe = $this->option('equipe');
+        $sectorId = Sector::orderBy('created_at')->value('id');
 
         try {
             DB::beginTransaction();
 
             // Se modo aleatório, selecionar vendedor aleatório
             if ($isRandom) {
-                $seller = $this->getRandomSeller();
+                $seller = $this->getRandomSeller($sectorId);
                 if (!$seller) {
                     $this->error('Nenhum vendedor encontrado no banco de dados!');
                     return 1;
@@ -62,7 +64,7 @@ class SimulateSaleCommand extends Command
                     return 1;
                 }
                 // Buscar ou criar seller
-                $seller = $this->findOrCreateSeller($sellerIdentifier);
+                $seller = $this->findOrCreateSeller($sellerIdentifier, $sectorId);
                 
                 if (!$seller) {
                     $this->error("Vendedor não encontrado: {$sellerIdentifier}");
@@ -81,7 +83,7 @@ class SimulateSaleCommand extends Command
             }
 
             // Buscar ou criar ScoreRule
-            $scoreRule = $this->getScoreRule($occurrenceType, $customPoints);
+            $scoreRule = $this->getScoreRule($occurrenceType, $customPoints, $sectorId);
 
             if (!$scoreRule) {
                 $this->error("Regra de pontuação não encontrada para: {$occurrenceType}");
@@ -94,6 +96,8 @@ class SimulateSaleCommand extends Command
 
             // Criar ocorrência (seguindo o fluxo do sistema)
             $apiOccurrence = ApiOccurrence::create([
+                'sector_id' => $sectorId,
+                'collaborator_identifier_type' => 'email',
                 'email_funcionario' => $seller->email,
                 'ocorrencia' => $occurrenceType,
                 'credor' => $credor,
@@ -103,6 +107,7 @@ class SimulateSaleCommand extends Command
 
             // Criar registro em scores (histórico)
             $score = Score::create([
+                'sector_id' => $sectorId,
                 'seller_id' => $seller->id,
                 'score_rule_id' => $scoreRule->id,
                 'points' => $scoreRule->points,
@@ -151,14 +156,14 @@ class SimulateSaleCommand extends Command
     /**
      * Busca ou cria o seller pelo email ou ID
      */
-    private function findOrCreateSeller(string $identifier): ?Seller
+    private function findOrCreateSeller(string $identifier, ?string $sectorId): ?Seller
     {
         // Tentar buscar por ID (UUID)
-        $seller = Seller::find($identifier);
+        $seller = Seller::where('sector_id', $sectorId)->find($identifier);
 
         // Se não encontrou, tentar por email
         if (!$seller) {
-            $seller = Seller::where('email', $identifier)->first();
+            $seller = Seller::where('sector_id', $sectorId)->where('email', $identifier)->first();
         }
 
         // Se ainda não encontrou, criar novo seller
@@ -170,6 +175,7 @@ class SimulateSaleCommand extends Command
             $name = $this->ask('Digite o nome do vendedor', $identifier);
             
             $seller = Seller::create([
+                'sector_id' => $sectorId,
                 'email' => $identifier,
                 'name' => $name,
                 'points' => 0,
@@ -185,7 +191,7 @@ class SimulateSaleCommand extends Command
     /**
      * Busca ou cria a ScoreRule para a ocorrência
      */
-    private function getScoreRule(string $occurrenceType, ?string $customPoints): ?ScoreRule
+    private function getScoreRule(string $occurrenceType, ?string $customPoints, ?string $sectorId): ?ScoreRule
     {
         // Se pontos customizados foram fornecidos, criar regra temporária
         if ($customPoints !== null) {
@@ -195,19 +201,20 @@ class SimulateSaleCommand extends Command
                 [
                     'ocorrencia' => $occurrenceType,
                     'is_active' => true,
+                    'sector_id' => $sectorId,
                 ],
                 [
                     'points' => $points,
                     'description' => "Regra customizada para {$occurrenceType}",
-                    'priority' => 1,
                     'is_active' => true,
+                    'sector_id' => $sectorId,
             ]);
         }
 
         // Buscar regra existente
-        $scoreRule = ScoreRule::where('ocorrencia', $occurrenceType)
+        $scoreRule = ScoreRule::where('sector_id', $sectorId)
+            ->where('ocorrencia', $occurrenceType)
             ->where('is_active', true)
-            ->orderBy('priority', 'desc')
             ->first();
 
         // Se não encontrou, perguntar se deseja criar
@@ -220,10 +227,10 @@ class SimulateSaleCommand extends Command
             $description = $this->ask('Digite a descrição', "Pontos por {$occurrenceType}");
 
             $scoreRule = ScoreRule::create([
+                'sector_id' => $sectorId,
                 'ocorrencia' => $occurrenceType,
                 'points' => $points,
                 'description' => $description,
-                'priority' => 1,
                 'is_active' => true,
             ]);
 
@@ -236,8 +243,8 @@ class SimulateSaleCommand extends Command
     /**
      * Seleciona um vendedor aleatório do banco de dados
      */
-    private function getRandomSeller(): ?Seller
+    private function getRandomSeller(?string $sectorId): ?Seller
     {
-        return Seller::inRandomOrder()->first();
+        return Seller::where('sector_id', $sectorId)->inRandomOrder()->first();
     }
 }

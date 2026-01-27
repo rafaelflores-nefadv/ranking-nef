@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Seller;
 use App\Models\Team;
 use App\Models\Season;
+use App\Models\Sector;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -35,8 +36,9 @@ class SellerSeeder extends Seeder
             $quantity = 30;
         }
 
+        $defaultSectorId = Sector::where('slug', 'geral')->value('id');
         // Buscar todas as equipes criadas
-        $teams = Team::all();
+        $teams = Team::where('sector_id', $defaultSectorId)->get();
         
         if ($teams->isEmpty()) {
             if ($this->command) {
@@ -97,10 +99,10 @@ class SellerSeeder extends Seeder
             // Status aleatório (80% ativos, 20% inativos)
             $status = fake()->randomElement(['active', 'active', 'active', 'active', 'inactive']);
 
-            Seller::updateOrCreate(
+            $seller = Seller::updateOrCreate(
                 ['email' => $email],
                 [
-                    'team_id' => $team->id,
+                    'sector_id' => $defaultSectorId,
                     'season_id' => $activeSeason?->id,
                     'name' => $name,
                     'email' => $email,
@@ -108,6 +110,7 @@ class SellerSeeder extends Seeder
                     'status' => $status,
                 ]
             );
+            $seller->teams()->sync([$team->id]);
             
             $created++;
         }

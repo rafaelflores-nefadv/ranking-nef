@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Config;
 use App\Services\DashboardAnalyticsService;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -18,6 +19,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         // Obter filtros da requisição
         $filters = [
@@ -28,10 +30,10 @@ class DashboardController extends Controller
         ];
 
         // Obter dados analíticos
-        $analyticsData = $this->analyticsService->getAnalyticsData($filters, $allowedTeamIds);
+        $analyticsData = $this->analyticsService->getAnalyticsData($filters, $allowedTeamIds, $sectorId);
 
         // Obter listas para filtros
-        $teams = $this->analyticsService->getAvailableTeams($allowedTeamIds);
+        $teams = $this->analyticsService->getAvailableTeams($allowedTeamIds, $sectorId);
         $seasons = $this->analyticsService->getAvailableSeasons();
 
         // Configurações do sistema

@@ -8,6 +8,7 @@ use App\Models\Season;
 use App\Models\ScoreRule;
 use App\Models\Seller;
 use App\Models\Team;
+use App\Services\SectorService;
 use App\Services\PermissionService;
 use Illuminate\Http\Request;
 
@@ -20,7 +21,9 @@ class SettingsController extends Controller
         if (!$user || $user->role !== 'admin') {
             abort(403, 'Acesso negado');
         }
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
         $configs = Config::all()->pluck('value', 'key');
         $notificationEventsConfig = $this->normalizeNotificationEventsConfig(
             $configs['notifications_events_config'] ?? null
@@ -39,7 +42,9 @@ class SettingsController extends Controller
             'sound' => 'Som',
         ];
         $seasons = Season::all();
-        $scoreRules = ScoreRule::orderBy('priority')->orderBy('ocorrencia')->get();
+        $scoreRules = ScoreRule::where('sector_id', $sectorId)
+            ->orderBy('ocorrencia')
+            ->get();
 
         // Carregar permissões do supervisor
         $supervisorPermissions = PermissionService::getSupervisorPermissions();
@@ -315,6 +320,7 @@ class SettingsController extends Controller
         $voiceMode = $voiceMode ?: 'server';
         $scope = Config::where('key', 'notifications_voice_scope')->value('value') ?? 'global';
         $precision = (int) (Config::where('key', 'points_precision')->value('value') ?? 2);
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         // Busca temporada ativa
         $season = Season::where('is_active', true)->first();
@@ -330,7 +336,7 @@ class SettingsController extends Controller
 
         // Busca dados do ranking geral se o escopo incluir global
         if (in_array($scope, ['global', 'both'], true)) {
-            $globalTop = $this->getTopSellers($season->id, null);
+            $globalTop = $this->getTopSellers($season->id, null, $sectorId);
             if ($globalTop->isNotEmpty()) {
                 $texts[] = $this->buildRankingText('Top 3 do ranking geral:', $globalTop->all(), $precision);
             }
@@ -338,9 +344,9 @@ class SettingsController extends Controller
 
         // Busca dados do ranking por equipes se o escopo incluir teams
         if (in_array($scope, ['teams', 'both'], true)) {
-            $teams = Team::orderBy('name')->get(['id', 'name']);
+            $teams = Team::where('sector_id', $sectorId)->orderBy('name')->get(['id', 'name']);
             foreach ($teams as $team) {
-                $teamTop = $this->getTopSellers($season->id, $team->id);
+                $teamTop = $this->getTopSellers($season->id, $team->id, $sectorId);
                 if ($teamTop->isNotEmpty()) {
                     $texts[] = $this->buildRankingText("Top 3 da equipe {$team->name}:", $teamTop->all(), $precision);
                 }
@@ -370,15 +376,18 @@ class SettingsController extends Controller
         ]);
     }
 
-    private function getTopSellers(string $seasonId, ?string $teamId)
+    private function getTopSellers(string $seasonId, ?string $teamId, ?string $sectorId)
     {
         $query = Seller::query()
             ->where('season_id', $seasonId)
+            ->where('sector_id', $sectorId)
             ->orderBy('points', 'desc')
             ->limit(3);
 
         if ($teamId) {
-            $query->where('team_id', $teamId);
+            $query->whereHas('teams', function ($q) use ($teamId) {
+                $q->where('teams.id', $teamId);
+            });
         }
 
         return $query->get(['id', 'name', 'points']);
@@ -404,22 +413,20 @@ class SettingsController extends Controller
         if (!$user || $user->role !== 'admin') {
             abort(403, 'Acesso negado');
         }
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         $this->authorize('create', ScoreRule::class);
 
         $validated = $request->validate([
             'ocorrencia' => 'required|string',
             'points' => 'required|numeric',
-            'description' => 'nullable|string',
-            'priority' => 'nullable|integer',
             'is_active' => 'nullable|boolean',
         ]);
 
         ScoreRule::create([
+            'sector_id' => $sectorId,
             'ocorrencia' => $validated['ocorrencia'],
             'points' => $validated['points'],
-            'description' => $validated['description'] ?? null,
-            'priority' => $validated['priority'] ?? 0,
             'is_active' => $request->boolean('is_active', true),
         ]);
 
@@ -435,22 +442,23 @@ class SettingsController extends Controller
         if (!$user || $user->role !== 'admin') {
             abort(403, 'Acesso negado');
         }
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         $this->authorize('update', $scoreRule);
 
         $validated = $request->validate([
             'ocorrencia' => 'required|string',
             'points' => 'required|numeric',
-            'description' => 'nullable|string',
-            'priority' => 'nullable|integer',
             'is_active' => 'nullable|boolean',
         ]);
+
+        if ($scoreRule->sector_id !== $sectorId) {
+            abort(403, 'Acesso negado');
+        }
 
         $scoreRule->update([
             'ocorrencia' => $validated['ocorrencia'],
             'points' => $validated['points'],
-            'description' => $validated['description'] ?? null,
-            'priority' => $validated['priority'] ?? null,
             'is_active' => $request->boolean('is_active'),
         ]);
 
@@ -468,6 +476,10 @@ class SettingsController extends Controller
         }
 
         $scoreRuleModel = ScoreRule::findOrFail($scoreRule);
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+        if ($scoreRuleModel->sector_id !== $sectorId) {
+            abort(403, 'Acesso negado');
+        }
         $this->authorize('delete', $scoreRuleModel);
 
         $scoreRuleModel->delete();
@@ -520,20 +532,48 @@ class SettingsController extends Controller
         }
 
         $validated = $request->validate([
-            'season_duration_days' => 'required|integer|min:1|max:3650',
+            'season_recurrence_type' => 'required|in:daily,weekly,monthly,bimonthly,quarterly,semiannual,annual,fixed_date,days',
+            'season_fixed_end_date' => 'nullable|date|required_if:season_recurrence_type,fixed_date',
+            'season_duration_days' => 'nullable|integer|min:1|max:3650|required_if:season_recurrence_type,days',
             'season_auto_renew' => 'nullable|boolean',
         ]);
 
         $configs = [
-            'season_duration_days' => (string) $validated['season_duration_days'],
+            'season_recurrence_type' => $validated['season_recurrence_type'],
+            'season_fixed_end_date' => $validated['season_fixed_end_date'] ?? null,
+            'season_duration_days' => isset($validated['season_duration_days']) ? (string) $validated['season_duration_days'] : null,
             'season_auto_renew' => $request->boolean('season_auto_renew') ? 'true' : 'false',
         ];
 
         foreach ($configs as $key => $value) {
-            Config::updateOrCreate(
-                ['key' => $key],
-                ['value' => $value]
+            if ($value !== null) {
+                Config::updateOrCreate(
+                    ['key' => $key],
+                    ['value' => $value]
+                );
+            }
+        }
+
+        // Atualizar temporada ativa se existir, baseado nas novas configurações
+        $activeSeason = Season::where('is_active', true)->first();
+        if ($activeSeason) {
+            // Usar a data de início atual da temporada para recalcular
+            // O método calculateDatesByRecurrence já ajusta o início para o período correto
+            // (ex: início do mês para mensal, início do ano para anual, etc.)
+            $dates = Season::calculateDatesByRecurrence(
+                $validated['season_recurrence_type'],
+                $activeSeason->starts_at,
+                $validated['season_fixed_end_date'] ?? null,
+                isset($validated['season_duration_days']) ? (int) $validated['season_duration_days'] : null
             );
+
+            $activeSeason->update([
+                'starts_at' => $dates['starts_at'],
+                'ends_at' => $dates['ends_at'],
+                'recurrence_type' => $validated['season_recurrence_type'],
+                'fixed_end_date' => $validated['season_fixed_end_date'] ? \Carbon\Carbon::parse($validated['season_fixed_end_date']) : null,
+                'duration_days' => isset($validated['season_duration_days']) ? (int) $validated['season_duration_days'] : null,
+            ]);
         }
 
         return redirect()
@@ -693,7 +733,9 @@ class SettingsController extends Controller
         }
 
         // Buscar um monitor ativo para preview, ou criar um monitor fictício
-        $monitor = \App\Models\Monitor::where('is_active', true)->first();
+        $monitor = \App\Models\Monitor::where('is_active', true)
+            ->where('sector_id', $sectorId)
+            ->first();
         
         if (!$monitor) {
             // Criar monitor fictício para preview
@@ -703,6 +745,7 @@ class SettingsController extends Controller
             $monitor->slug = 'preview';
             $monitor->is_active = true;
             $monitor->settings = [];
+            $monitor->sector_id = $sectorId;
         }
 
         $settings = $monitor->getMergedSettings();
@@ -711,10 +754,19 @@ class SettingsController extends Controller
         $gamificationService = app(\App\Services\GamificationService::class);
         
         // Obter dados do dashboard (sem filtro de usuário - público)
-        $teams = Team::orderBy('name')->get(['id', 'name']);
+        $teams = Team::where('sector_id', $sectorId)->orderBy('name')->get(['id', 'name']);
         $activeTeam = null;
 
-        $sellersQuery = Seller::with(['team', 'season']);
+        // Buscar temporada ativa para preview
+        $activeSeason = Season::where('is_active', true)->first();
+
+        $sellersQuery = Seller::with(['teams', 'season'])->where('sector_id', $sectorId);
+        
+        // Filtrar por temporada ativa (apenas vendedores da temporada atual)
+        if ($activeSeason) {
+            $sellersQuery->where('season_id', $activeSeason->id);
+        }
+        
         $sellers = $sellersQuery
             ->orderBy('points', 'desc')
             ->limit(100)

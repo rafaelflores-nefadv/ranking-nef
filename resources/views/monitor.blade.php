@@ -557,7 +557,7 @@
         const sale = toastQueue.shift();
 
         const sellerName = sale?.seller?.name || 'Colaborador';
-        const occurrenceLabel = sale?.occurrence?.description || sale?.occurrence?.type || `${saleTermLabel} registrada`;
+        const occurrenceLabel = sale?.occurrence?.type || `${saleTermLabel} registrada`;
         const pointsLabel = formatPoints(sale?.points);
 
         const toast = document.createElement('div');

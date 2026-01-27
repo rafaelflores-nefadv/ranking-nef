@@ -18,9 +18,10 @@ class DashboardAnalyticsService
      *
      * @param array $filters ['team_id', 'season_id', 'month', 'year']
      * @param array|null $allowedTeamIds Equipes permitidas para o usuário
+     * @param string|null $sectorId Setor atual
      * @return array
      */
-    public function getAnalyticsData(array $filters = [], ?array $allowedTeamIds = null): array
+    public function getAnalyticsData(array $filters = [], ?array $allowedTeamIds = null, ?string $sectorId = null): array
     {
         $teamId = $filters['team_id'] ?? null;
         $seasonId = $filters['season_id'] ?? null;
@@ -44,19 +45,25 @@ class DashboardAnalyticsService
             ->join('sellers', 'scores.seller_id', '=', 'sellers.id')
             ->select(
                 'scores.*',
-                'sellers.team_id',
                 'sellers.season_id'
             );
+        if ($sectorId) {
+            $scoresQuery->where('scores.sector_id', $sectorId);
+        }
 
         // Aplicar filtros
         if ($teamId) {
             if ($allowedTeamIds === null || in_array($teamId, $allowedTeamIds)) {
-                $scoresQuery->where('sellers.team_id', $teamId);
+                $scoresQuery->whereHas('seller.teams', function($query) use ($teamId) {
+                    $query->where('teams.id', $teamId);
+                });
             } else {
                 $scoresQuery->whereRaw('1 = 0'); // Sem permissão
             }
         } elseif ($allowedTeamIds !== null) {
-            $scoresQuery->whereIn('sellers.team_id', $allowedTeamIds);
+            $scoresQuery->whereHas('seller.teams', function($query) use ($allowedTeamIds) {
+                $query->whereIn('teams.id', $allowedTeamIds);
+            });
         }
 
         if ($seasonId) {
@@ -81,19 +88,19 @@ class DashboardAnalyticsService
         $percentualMC = $totalReceita > 0 ? ($margemContribuicao / $totalReceita) * 100 : 0;
 
         // Evolução por mês (últimos 6 meses ou período da temporada)
-        $evolucaoMensal = $this->getEvolucaoMensal($scoresQuery, $year, $seasonId, $teamId, $month, $allowedTeamIds, $margemPercentual);
+        $evolucaoMensal = $this->getEvolucaoMensal($scoresQuery, $year, $seasonId, $teamId, $month, $allowedTeamIds, $margemPercentual, $sectorId);
 
         // Melhor mês
         $melhorMes = $this->getMelhorMes($evolucaoMensal);
 
         // Dados por equipe
-        $dadosPorEquipe = $this->getDadosPorEquipe($scoresQuery, $teamId, $allowedTeamIds, $margemPercentual);
+        $dadosPorEquipe = $this->getDadosPorEquipe($scoresQuery, $teamId, $allowedTeamIds, $margemPercentual, $sectorId);
 
         // Dados por temporada
-        $dadosPorTemporada = $this->getDadosPorTemporada($scoresQuery, $seasonId, $margemPercentual);
+        $dadosPorTemporada = $this->getDadosPorTemporada($scoresQuery, $seasonId, $margemPercentual, $teamId, $allowedTeamIds, $sectorId);
 
         // Top fornecedores (baseado em score_rules/ocorrencias)
-        $topFornecedores = $this->getTopFornecedores($scoresQuery, $margemPercentual, $teamId, $seasonId, $month, $year, $allowedTeamIds);
+        $topFornecedores = $this->getTopFornecedores($scoresQuery, $margemPercentual, $teamId, $seasonId, $month, $year, $allowedTeamIds, $sectorId);
 
         return [
             'total_receita' => $totalReceita,
@@ -112,7 +119,7 @@ class DashboardAnalyticsService
     /**
      * Obtém evolução mensal dos últimos 6 meses ou período da temporada
      */
-    private function getEvolucaoMensal($baseQuery, ?int $year, ?string $seasonId, ?string $teamId, ?int $month, ?array $allowedTeamIds, float $margemPercentual): array
+    private function getEvolucaoMensal($baseQuery, ?int $year, ?string $seasonId, ?string $teamId, ?int $month, ?array $allowedTeamIds, float $margemPercentual, ?string $sectorId): array
     {
         $meses = [];
         $now = Carbon::now();
@@ -128,16 +135,23 @@ class DashboardAnalyticsService
                 ->join('sellers', 'scores.seller_id', '=', 'sellers.id')
                 ->whereYear('scores.created_at', $ano)
                 ->whereMonth('scores.created_at', $mes);
+            if ($sectorId) {
+                $query->where('scores.sector_id', $sectorId);
+            }
 
             // Aplicar filtros
             if ($teamId) {
                 if ($allowedTeamIds === null || in_array($teamId, $allowedTeamIds)) {
-                    $query->where('sellers.team_id', $teamId);
+                    $query->whereHas('seller.teams', function($q) use ($teamId) {
+                        $q->where('teams.id', $teamId);
+                    });
                 } else {
                     $query->whereRaw('1 = 0');
                 }
             } elseif ($allowedTeamIds !== null) {
-                $query->whereIn('sellers.team_id', $allowedTeamIds);
+                $query->whereHas('seller.teams', function($q) use ($allowedTeamIds) {
+                    $q->whereIn('teams.id', $allowedTeamIds);
+                });
             }
 
             if ($seasonId) {
@@ -168,16 +182,23 @@ class DashboardAnalyticsService
                 ->join('sellers', 'scores.seller_id', '=', 'sellers.id')
                 ->whereYear('scores.created_at', $ano)
                 ->whereMonth('scores.created_at', $mes);
+            if ($sectorId) {
+                $query->where('scores.sector_id', $sectorId);
+            }
 
             // Aplicar filtros
             if ($teamId) {
                 if ($allowedTeamIds === null || in_array($teamId, $allowedTeamIds)) {
-                    $query->where('sellers.team_id', $teamId);
+                    $query->whereHas('seller.teams', function($q) use ($teamId) {
+                        $q->where('teams.id', $teamId);
+                    });
                 } else {
                     $query->whereRaw('1 = 0');
                 }
             } elseif ($allowedTeamIds !== null) {
-                $query->whereIn('sellers.team_id', $allowedTeamIds);
+                $query->whereHas('seller.teams', function($q) use ($allowedTeamIds) {
+                    $q->whereIn('teams.id', $allowedTeamIds);
+                });
             }
 
             if ($seasonId) {
@@ -217,7 +238,7 @@ class DashboardAnalyticsService
     /**
      * Obtém dados agregados por equipe
      */
-    private function getDadosPorEquipe($baseQuery, ?string $teamId, ?array $allowedTeamIds, float $margemPercentual): Collection
+    private function getDadosPorEquipe($baseQuery, ?string $teamId, ?array $allowedTeamIds, float $margemPercentual, ?string $sectorId): Collection
     {
         // Obter filtros da query base
         $seasonFilter = null;
@@ -229,7 +250,8 @@ class DashboardAnalyticsService
 
         $query = Score::query()
             ->join('sellers', 'scores.seller_id', '=', 'sellers.id')
-            ->join('teams', 'sellers.team_id', '=', 'teams.id')
+            ->join('seller_team', 'sellers.id', '=', 'seller_team.seller_id')
+            ->join('teams', 'seller_team.team_id', '=', 'teams.id')
             ->select(
                 'teams.id',
                 'teams.name',
@@ -237,6 +259,10 @@ class DashboardAnalyticsService
                 DB::raw('COUNT(scores.id) as total_scores')
             )
             ->groupBy('teams.id', 'teams.name');
+        if ($sectorId) {
+            $query->where('scores.sector_id', $sectorId)
+                ->where('teams.sector_id', $sectorId);
+        }
 
         if ($teamId) {
             $query->where('teams.id', $teamId);
@@ -267,21 +293,8 @@ class DashboardAnalyticsService
     /**
      * Obtém dados agregados por temporada
      */
-    private function getDadosPorTemporada($baseQuery, ?string $seasonId, float $margemPercentual): Collection
+    private function getDadosPorTemporada($baseQuery, ?string $seasonId, float $margemPercentual, ?string $teamId = null, ?array $allowedTeamIds = null, ?string $sectorId = null): Collection
     {
-        // Obter filtros da query base
-        $teamFilter = null;
-        $allowedTeamIds = null;
-        foreach ($baseQuery->getQuery()->wheres as $where) {
-            if (isset($where['column'])) {
-                if ($where['column'] === 'sellers.team_id' && $where['type'] === 'Basic') {
-                    $teamFilter = $where['value'];
-                } elseif ($where['column'] === 'sellers.team_id' && $where['type'] === 'In') {
-                    $allowedTeamIds = $where['values'];
-                }
-            }
-        }
-
         $query = Score::query()
             ->join('sellers', 'scores.seller_id', '=', 'sellers.id')
             ->join('seasons', 'sellers.season_id', '=', 'seasons.id')
@@ -292,15 +305,27 @@ class DashboardAnalyticsService
                 DB::raw('COUNT(scores.id) as total_scores')
             )
             ->groupBy('seasons.id', 'seasons.name');
+        if ($sectorId) {
+            $query->where('scores.sector_id', $sectorId);
+        }
 
         if ($seasonId) {
             $query->where('seasons.id', $seasonId);
         }
 
-        if ($teamFilter) {
-            $query->where('sellers.team_id', $teamFilter);
+        // Aplicar filtros de equipe
+        if ($teamId) {
+            if ($allowedTeamIds === null || in_array($teamId, $allowedTeamIds)) {
+                $query->whereHas('seller.teams', function($q) use ($teamId) {
+                    $q->where('teams.id', $teamId);
+                });
+            } else {
+                $query->whereRaw('1 = 0');
+            }
         } elseif ($allowedTeamIds !== null) {
-            $query->whereIn('sellers.team_id', $allowedTeamIds);
+            $query->whereHas('seller.teams', function($q) use ($allowedTeamIds) {
+                $q->whereIn('teams.id', $allowedTeamIds);
+            });
         }
 
         return $query->get()->map(function ($item) use ($margemPercentual) {
@@ -322,30 +347,36 @@ class DashboardAnalyticsService
     /**
      * Obtém top fornecedores (baseado em ocorrências/score_rules)
      */
-    private function getTopFornecedores($baseQuery, float $margemPercentual, ?string $teamId, ?string $seasonId, ?int $month, ?int $year, ?array $allowedTeamIds): Collection
+    private function getTopFornecedores($baseQuery, float $margemPercentual, ?string $teamId, ?string $seasonId, ?int $month, ?int $year, ?array $allowedTeamIds, ?string $sectorId): Collection
     {
         $query = Score::query()
             ->join('sellers', 'scores.seller_id', '=', 'sellers.id')
             ->join('score_rules', 'scores.score_rule_id', '=', 'score_rules.id')
             ->select(
                 'score_rules.ocorrencia as fornecedor',
-                'score_rules.description',
                 DB::raw('SUM(scores.points) as total_receita'),
                 DB::raw('COUNT(scores.id) as total_ocorrencias')
             )
-            ->groupBy('score_rules.ocorrencia', 'score_rules.description')
+            ->groupBy('score_rules.ocorrencia')
             ->orderByDesc('total_receita')
             ->limit(10);
+        if ($sectorId) {
+            $query->where('scores.sector_id', $sectorId);
+        }
 
         // Aplicar mesmos filtros da query base
         if ($teamId) {
             if ($allowedTeamIds === null || in_array($teamId, $allowedTeamIds)) {
-                $query->where('sellers.team_id', $teamId);
+                $query->whereHas('seller.teams', function($q) use ($teamId) {
+                    $q->where('teams.id', $teamId);
+                });
             } else {
                 $query->whereRaw('1 = 0'); // Sem permissão
             }
         } elseif ($allowedTeamIds !== null) {
-            $query->whereIn('sellers.team_id', $allowedTeamIds);
+            $query->whereHas('seller.teams', function($q) use ($allowedTeamIds) {
+                $q->whereIn('teams.id', $allowedTeamIds);
+            });
         }
 
         if ($seasonId) {
@@ -365,9 +396,19 @@ class DashboardAnalyticsService
             $margem = $receita * $margemPercentual;
             $percentual = $receita > 0 ? ($margem / $receita) * 100 : 0;
 
+            // A descrição agora está incluída na ocorrência (formato: "código - descrição")
+            $ocorrencia = $item->fornecedor;
+            $descricao = $ocorrencia;
+            
+            // Tentar extrair apenas a descrição se houver " - " na ocorrência
+            if (strpos($ocorrencia, ' - ') !== false) {
+                $parts = explode(' - ', $ocorrencia, 2);
+                $descricao = $parts[1] ?? $ocorrencia;
+            }
+
             return [
-                'fornecedor' => $item->fornecedor,
-                'descricao' => $item->description,
+                'fornecedor' => $ocorrencia,
+                'descricao' => $descricao,
                 'receita' => $receita,
                 'margem' => $margem,
                 'percentual_mc' => round($percentual, 2),
@@ -379,9 +420,12 @@ class DashboardAnalyticsService
     /**
      * Obtém lista de equipes disponíveis
      */
-    public function getAvailableTeams(?array $allowedTeamIds = null): Collection
+    public function getAvailableTeams(?array $allowedTeamIds = null, ?string $sectorId = null): Collection
     {
         $query = Team::orderBy('name');
+        if ($sectorId) {
+            $query->where('sector_id', $sectorId);
+        }
         
         if ($allowedTeamIds !== null) {
             $query->whereIn('id', $allowedTeamIds);

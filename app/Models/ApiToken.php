@@ -15,6 +15,8 @@ class ApiToken extends Model
 
     protected $fillable = [
         'integration_id',
+        'sector_id',
+        'collaborator_identifier_type',
         'token',
         'secret_hash',
         'last_used_at',
@@ -39,6 +41,11 @@ class ApiToken extends Model
     public function integration(): BelongsTo
     {
         return $this->belongsTo(ApiIntegration::class, 'integration_id');
+    }
+
+    public function sector(): BelongsTo
+    {
+        return $this->belongsTo(Sector::class);
     }
 
     /**

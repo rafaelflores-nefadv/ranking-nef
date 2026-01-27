@@ -14,7 +14,8 @@ class SpeakRankingJob implements ShouldQueue
 
     public function __construct(
         private string $scope,
-        private string $content
+        private string $content,
+        private ?string $sectorId = null
     ) {
     }
 
@@ -28,6 +29,7 @@ class SpeakRankingJob implements ShouldQueue
         }
 
         NotificationHistory::create([
+            'sector_id' => $this->sectorId,
             'type' => 'voice_ranking',
             'scope' => $this->scope,
             'content' => $this->content,

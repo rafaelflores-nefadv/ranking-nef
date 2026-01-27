@@ -11,8 +11,11 @@
         </div>
 
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
-            <form method="POST" action="{{ route('users.store') }}">
+            <form method="POST" action="{{ route('users.store') }}" enctype="multipart/form-data">
                 @csrf
+
+                <!-- Avatar -->
+                <x-avatar-upload name="avatar" label="Foto de Perfil" />
 
                 <!-- Nome -->
                 <div class="mb-4">
@@ -42,12 +45,30 @@
                         <option value="">Selecione um perfil</option>
                         <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Administrador</option>
                         <option value="supervisor" {{ old('role') === 'supervisor' ? 'selected' : '' }}>Supervisor</option>
+                        <option value="user" {{ old('role') === 'user' ? 'selected' : '' }}>Usuário</option>
                     </select>
                     <p class="mt-1 text-xs text-slate-400">
                         <span id="role-hint-admin" class="hidden">Administrador: Acesso completo ao sistema</span>
                         <span id="role-hint-supervisor" class="hidden">Supervisor: Acesso para gerenciar colaboradores e equipes</span>
+                        <span id="role-hint-user" class="hidden">Usuário: Acesso apenas para visualização</span>
                     </p>
                     @error('role')
+                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <!-- Setor (supervisor e usuário) -->
+                <div id="sector-section" class="mb-4 hidden">
+                    <label for="sector_id" class="block text-sm font-medium text-slate-300 mb-2">Setor</label>
+                    <select id="sector_id" name="sector_id" class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Selecione um setor</option>
+                        @foreach($sectors ?? [] as $sector)
+                            <option value="{{ $sector->id }}" {{ old('sector_id') === $sector->id ? 'selected' : '' }}>
+                                {{ $sector->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('sector_id')
                         <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
                     @enderror
                 </div>
@@ -175,11 +196,13 @@
     document.addEventListener('DOMContentLoaded', function() {
         const roleSelect = document.getElementById('role');
         const teamsSection = document.getElementById('teams-section');
+        const sectorSection = document.getElementById('sector-section');
         
         if (roleSelect) {
             const hints = {
                 admin: document.getElementById('role-hint-admin'),
-                supervisor: document.getElementById('role-hint-supervisor')
+                supervisor: document.getElementById('role-hint-supervisor'),
+                user: document.getElementById('role-hint-user')
             };
 
             function toggleHint() {
@@ -189,6 +212,18 @@
                 });
                 if (role && hints[role]) {
                     hints[role].classList.remove('hidden');
+                }
+
+                if (sectorSection) {
+                    if (role === 'supervisor' || role === 'user') {
+                        sectorSection.classList.remove('hidden');
+                    } else {
+                        sectorSection.classList.add('hidden');
+                        const sectorSelect = sectorSection.querySelector('select');
+                        if (sectorSelect) {
+                            sectorSelect.value = '';
+                        }
+                    }
                 }
 
                 // Mostrar/ocultar seção de equipes

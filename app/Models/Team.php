@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -13,12 +14,21 @@ class Team extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
+        'sector_id',
         'name',
     ];
 
-    public function sellers(): HasMany
+    /**
+     * Get the sellers that belong to this team.
+     */
+    public function sellers(): BelongsToMany
     {
-        return $this->hasMany(Seller::class);
+        return $this->belongsToMany(Seller::class, 'seller_team');
+    }
+
+    public function sector(): BelongsTo
+    {
+        return $this->belongsTo(Sector::class);
     }
 
     /**

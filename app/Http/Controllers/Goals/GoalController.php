@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreGoalRequest;
 use App\Http\Requests\UpdateGoalRequest;
 use App\Models\Goal;
+use App\Models\Sector;
 use App\Models\Team;
 use App\Models\Season;
 use App\Models\Seller;
 use App\Services\GoalService;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -25,8 +27,10 @@ class GoalController extends Controller
 
         $user = $request->user();
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
-        $goalsQuery = Goal::with(['season', 'team', 'seller']);
+        $goalsQuery = Goal::with(['season', 'team', 'seller'])
+            ->where('sector_id', $sectorId);
         
         // Filtrar metas baseado no papel do usuário
         if ($allowedTeamIds !== null) {
@@ -38,7 +42,9 @@ class GoalController extends Controller
                             ->whereIn('team_id', $allowedTeamIds);
                     })
                     ->orWhereHas('seller', function ($q) use ($allowedTeamIds) {
-                        $q->whereIn('team_id', $allowedTeamIds);
+                        $q->whereHas('teams', function ($teamQuery) use ($allowedTeamIds) {
+                            $teamQuery->whereIn('teams.id', $allowedTeamIds);
+                        });
                     });
             });
         }
@@ -65,7 +71,7 @@ class GoalController extends Controller
         });
 
         $seasons = Season::all();
-        $teamsQuery = Team::orderBy('name');
+        $teamsQuery = Team::where('sector_id', $sectorId)->orderBy('name');
         if ($allowedTeamIds !== null) {
             $teamsQuery->whereIn('id', $allowedTeamIds);
         }
@@ -80,29 +86,47 @@ class GoalController extends Controller
 
         $user = $request->user();
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+
+        $sectors = $user->role === 'admin'
+            ? Sector::where('is_active', true)->orderBy('name')->get(['id', 'name'])
+            : collect();
 
         // Filtrar equipes baseado no papel do usuário
         $teamsQuery = Team::orderBy('name');
+        if ($user->role !== 'admin') {
+            $teamsQuery->where('sector_id', $sectorId);
+        }
         if ($allowedTeamIds !== null) {
             $teamsQuery->whereIn('id', $allowedTeamIds);
         }
         $teams = $teamsQuery->get();
-        
+
         $seasons = Season::all();
         
         // Filtrar vendedores baseado nas equipes permitidas
-        $sellersQuery = Seller::with(['team'])->orderBy('name');
+        $sellersQuery = Seller::with(['teams'])->orderBy('name');
+        if ($user->role !== 'admin') {
+            $sellersQuery->where('sector_id', $sectorId);
+        }
         if ($allowedTeamIds !== null) {
-            $sellersQuery->whereIn('team_id', $allowedTeamIds);
+            $sellersQuery->whereHas('teams', function ($q) use ($allowedTeamIds) {
+                $q->whereIn('teams.id', $allowedTeamIds);
+            });
         }
         $sellers = $sellersQuery->get();
 
-        return view('goals.create', compact('teams', 'seasons', 'sellers'));
+        return view('goals.create', compact('teams', 'seasons', 'sellers', 'sectors'));
     }
 
     public function store(StoreGoalRequest $request)
     {
         $validated = $request->validated();
+        $user = $request->user();
+        $sectorId = $user->role === 'admin'
+            ? $request->input('sector_id')
+            : $user->sector_id;
+        $validated['sector_id'] = $sectorId;
         
         // Criar meta única
         if ($request->scope !== 'team' || !$request->has('create_for_all_team_sellers')) {
@@ -115,7 +139,11 @@ class GoalController extends Controller
         // Criar metas em massa para todos os vendedores da equipe
         if ($validated['scope'] === 'team' && $request->has('create_for_all_team_sellers')) {
             $teamId = $validated['team_id'];
-            $sellers = Seller::where('team_id', $teamId)->get();
+            $sellers = Seller::where('sector_id', $validated['sector_id'])
+                ->whereHas('teams', function ($q) use ($teamId) {
+                    $q->where('teams.id', $teamId);
+                })
+                ->get();
             
             if ($sellers->isEmpty()) {
                 return redirect()->back()
@@ -126,6 +154,7 @@ class GoalController extends Controller
             DB::transaction(function () use ($validated, $sellers) {
                 foreach ($sellers as $seller) {
                     Goal::create([
+                        'sector_id' => $validated['sector_id'],
                         'scope' => 'seller',
                         'season_id' => $validated['season_id'],
                         'team_id' => null,
@@ -163,9 +192,12 @@ class GoalController extends Controller
 
         $user = $request->user();
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = $user->role === 'admin'
+            ? $goal->sector_id
+            : $user->sector_id;
 
         // Filtrar equipes baseado no papel do usuário
-        $teamsQuery = Team::orderBy('name');
+        $teamsQuery = Team::where('sector_id', $sectorId)->orderBy('name');
         if ($allowedTeamIds !== null) {
             $teamsQuery->whereIn('id', $allowedTeamIds);
         }
@@ -174,20 +206,35 @@ class GoalController extends Controller
         $seasons = Season::all();
         
         // Filtrar vendedores baseado nas equipes permitidas
-        $sellersQuery = Seller::with(['team'])->orderBy('name');
+        $sellersQuery = Seller::with(['teams'])->where('sector_id', $sectorId)->orderBy('name');
         if ($allowedTeamIds !== null) {
-            $sellersQuery->whereIn('team_id', $allowedTeamIds);
+            $sellersQuery->whereHas('teams', function ($q) use ($allowedTeamIds) {
+                $q->whereIn('teams.id', $allowedTeamIds);
+            });
         }
         $sellers = $sellersQuery->get();
 
         $goal->load(['season', 'team', 'seller']);
 
-        return view('goals.edit', compact('goal', 'teams', 'seasons', 'sellers'));
+        $sectors = collect();
+        if ($user->role === 'admin') {
+            $sectors = Sector::where('is_active', true)
+                ->orWhere('id', $goal->sector_id)
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
+        return view('goals.edit', compact('goal', 'teams', 'seasons', 'sellers', 'sectors'));
     }
 
     public function update(UpdateGoalRequest $request, Goal $goal)
     {
-        $goal->update($request->validated());
+        $validated = $request->validated();
+        $user = $request->user();
+        $validated['sector_id'] = $user->role === 'admin'
+            ? $request->input('sector_id')
+            : $user->sector_id;
+        $goal->update($validated);
 
         return redirect()->route('goals.index')
             ->with('success', 'Meta atualizada com sucesso!');

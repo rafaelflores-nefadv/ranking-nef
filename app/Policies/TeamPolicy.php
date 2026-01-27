@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\PermissionService;
+use App\Services\SectorService;
 
 class TeamPolicy
 {
@@ -39,6 +40,9 @@ class TeamPolicy
         // supervisor só pode ver suas equipes
         if ($user->role === 'supervisor') {
             $allowedTeamIds = $user->getSupervisedTeamIds();
+            if (!$this->isInUserSector($user, $team)) {
+                return false;
+            }
             return in_array($team->id, $allowedTeamIds);
         }
         
@@ -80,6 +84,9 @@ class TeamPolicy
             }
             
             $allowedTeamIds = $user->getSupervisedTeamIds();
+            if (!$this->isInUserSector($user, $team)) {
+                return false;
+            }
             return in_array($team->id, $allowedTeamIds);
         }
 
@@ -103,9 +110,22 @@ class TeamPolicy
             }
             
             $allowedTeamIds = $user->getSupervisedTeamIds();
+            if (!$this->isInUserSector($user, $team)) {
+                return false;
+            }
             return in_array($team->id, $allowedTeamIds);
         }
 
         return false;
+    }
+
+    private function isInUserSector(User $user, Team $team): bool
+    {
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        $sectorId = $user->sector_id ?? app(SectorService::class)->getDefaultSectorId();
+        return $team->sector_id === $sectorId;
     }
 }

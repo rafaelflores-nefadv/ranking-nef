@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Reports;
 use App\Http\Controllers\Controller;
 use App\Models\Season;
 use App\Services\RankingService;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -25,6 +26,7 @@ class RankingTeamController extends Controller
         }
 
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         // Filtros
         $seasonId = $request->query('season') ?: null;
@@ -32,7 +34,8 @@ class RankingTeamController extends Controller
         // Obter dados
         $ranking = $this->rankingService->getTeamRanking(
             $allowedTeamIds,
-            $seasonId
+            $seasonId,
+            $sectorId
         );
 
         // Dados para filtros

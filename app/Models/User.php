@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -20,8 +21,10 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'sector_id',
         'name',
         'email',
+        'avatar',
         'password',
         'role',
         'is_active',
@@ -51,6 +54,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function sector(): BelongsTo
+    {
+        return $this->belongsTo(Sector::class);
+    }
+
     /**
      * Get the teams that the user supervises.
      */
@@ -70,9 +78,17 @@ class User extends Authenticatable
         }
         
         if ($this->role === 'supervisor') {
-            return $this->teams()->pluck('teams.id')->toArray();
+            return $this->teams()
+                ->where('teams.sector_id', $this->sector_id)
+                ->pluck('teams.id')
+                ->toArray();
         }
         
         return []; // Outros roles não veem equipes
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Reports;
 use App\Http\Controllers\Controller;
 use App\Models\Seller;
 use App\Services\EvolutionService;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -25,6 +26,7 @@ class ScoreEvolutionController extends Controller
         }
 
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         // Filtros
         $sellerId = $request->query('seller') ?: null;
@@ -40,13 +42,19 @@ class ScoreEvolutionController extends Controller
             $sellerId,
             $allowedTeamIds,
             $startDate,
-            $endDate
+            $endDate,
+            $sectorId
         );
 
         // Dados para filtros
-        $sellersQuery = Seller::with('team')->orderBy('name');
+        $sellersQuery = Seller::with('teams')->orderBy('name');
+        if ($sectorId) {
+            $sellersQuery->where('sector_id', $sectorId);
+        }
         if ($allowedTeamIds !== null) {
-            $sellersQuery->whereIn('team_id', $allowedTeamIds);
+            $sellersQuery->whereHas('teams', function ($q) use ($allowedTeamIds) {
+                $q->whereIn('teams.id', $allowedTeamIds);
+            });
         }
         $sellers = $sellersQuery->get();
 

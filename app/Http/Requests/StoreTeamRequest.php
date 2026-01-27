@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Services\SectorService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreTeamRequest extends FormRequest
 {
@@ -21,8 +23,21 @@ class StoreTeamRequest extends FormRequest
      */
     public function rules(): array
     {
+        $user = $this->user();
+        $sectorId = $user && $user->role === 'admin'
+            ? $this->input('sector_id')
+            : ($user?->sector_id ?? app(SectorService::class)->getDefaultSectorId());
+
         return [
-            'name' => 'required|string|max:255|unique:teams,name',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('teams', 'name')->where('sector_id', $sectorId),
+            ],
+            'sector_id' => $user && $user->role === 'admin'
+                ? 'required|uuid|exists:sectors,id'
+                : 'prohibited',
         ];
     }
 
@@ -37,6 +52,8 @@ class StoreTeamRequest extends FormRequest
             'name.required' => 'O nome da equipe é obrigatório.',
             'name.max' => 'O nome da equipe não pode ter mais de 255 caracteres.',
             'name.unique' => 'Já existe uma equipe com este nome.',
+            'sector_id.required' => 'Selecione um setor.',
+            'sector_id.exists' => 'O setor selecionado é inválido.',
         ];
     }
 }

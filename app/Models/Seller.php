@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Seller extends Model
@@ -13,10 +14,12 @@ class Seller extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
-        'team_id',
+        'sector_id',
         'season_id',
         'name',
         'email',
+        'external_code',
+        'avatar',
         'points',
         'status',
     ];
@@ -28,9 +31,26 @@ class Seller extends Model
         ];
     }
 
-    public function team(): BelongsTo
+    /**
+     * Get the teams that the seller belongs to.
+     */
+    public function teams(): BelongsToMany
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsToMany(Team::class, 'seller_team');
+    }
+
+    public function sector(): BelongsTo
+    {
+        return $this->belongsTo(Sector::class);
+    }
+
+    /**
+     * Get the primary team (for backward compatibility).
+     * Accessor that returns the first team.
+     */
+    public function getTeamAttribute(): ?Team
+    {
+        return $this->teams->first();
     }
 
     public function season(): BelongsTo

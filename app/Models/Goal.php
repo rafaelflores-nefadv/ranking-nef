@@ -12,6 +12,7 @@ class Goal extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
+        'sector_id',
         'scope',
         'season_id',
         'team_id',
@@ -35,6 +36,11 @@ class Goal extends Model
     public function season(): BelongsTo
     {
         return $this->belongsTo(Season::class);
+    }
+
+    public function sector(): BelongsTo
+    {
+        return $this->belongsTo(Sector::class);
     }
 
     public function team(): BelongsTo

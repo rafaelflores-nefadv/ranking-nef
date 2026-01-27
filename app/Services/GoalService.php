@@ -53,6 +53,7 @@ class GoalService
     private function getGlobalValue(Goal $goal): float
     {
         return Seller::where('season_id', $goal->season_id)
+            ->where('sector_id', $goal->sector_id)
             ->sum('points') ?? 0.0;
     }
 
@@ -66,7 +67,10 @@ class GoalService
         }
 
         return Seller::where('season_id', $goal->season_id)
-            ->where('team_id', $goal->team_id)
+            ->where('sector_id', $goal->sector_id)
+            ->whereHas('teams', function ($q) use ($goal) {
+                $q->where('teams.id', $goal->team_id);
+            })
             ->sum('points') ?? 0.0;
     }
 
@@ -80,7 +84,10 @@ class GoalService
         }
 
         $seller = Seller::find($goal->seller_id);
-        return $seller?->points ?? 0.0;
+        if ($seller && $seller->sector_id === $goal->sector_id) {
+            return $seller->points;
+        }
+        return 0.0;
     }
 
     /**
@@ -125,6 +132,7 @@ class GoalService
     public function duplicateForSeason(Goal $goal, string $seasonId): Goal
     {
         return Goal::create([
+            'sector_id' => $goal->sector_id,
             'scope' => $goal->scope,
             'season_id' => $seasonId,
             'team_id' => $goal->team_id,

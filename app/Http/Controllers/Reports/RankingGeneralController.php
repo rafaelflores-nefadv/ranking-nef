@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Season;
 use App\Models\Team;
 use App\Services\RankingService;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -27,6 +28,7 @@ class RankingGeneralController extends Controller
         }
 
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         // Filtros
         $seasonId = $request->query('season');
@@ -51,12 +53,16 @@ class RankingGeneralController extends Controller
             $startDate,
             $endDate,
             $teamId,
-            $limit
+            $limit,
+            $sectorId
         );
 
         // Dados para filtros
         $seasons = Season::orderBy('name')->get();
         $teamsQuery = Team::orderBy('name');
+        if ($sectorId) {
+            $teamsQuery->where('sector_id', $sectorId);
+        }
         if ($allowedTeamIds !== null) {
             $teamsQuery->whereIn('id', $allowedTeamIds);
         }

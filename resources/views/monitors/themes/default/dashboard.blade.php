@@ -165,7 +165,7 @@
                     <div class="relative w-32 h-32">
                         <svg class="w-full h-full transform -rotate-90">
                             <circle cx="64" cy="64" r="56" stroke="rgba(100, 116, 139, 0.3)" stroke-width="8" fill="none"></circle>
-                            <circle cx="64" cy="64" r="56" stroke="url(#gradient-timer)" stroke-width="8" fill="none" stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="87.965" class="transition-all duration-1000"></circle>
+                            <circle id="season-progress-circle" cx="64" cy="64" r="56" stroke="url(#gradient-timer)" stroke-width="8" fill="none" stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="{{ $activeSeason ? $activeSeason->getProgressCircleOffset() : 351.86 }}" class="transition-all duration-1000"></circle>
                             <defs>
                                 <linearGradient id="gradient-timer" x1="0%" y1="0%" x2="100%" y2="100%">
                                     <stop offset="0%" stop-color="#3b82f6"></stop>
@@ -174,7 +174,7 @@
                             </defs>
                         </svg>
                         <div class="absolute inset-0 flex flex-col items-center justify-center">
-                            <span class="text-white text-xl font-bold">2 sem 4d</span>
+                            <span id="season-remaining-time" class="text-white text-xl font-bold">{{ $activeSeason ? $activeSeason->getRemainingTimeFormatted() : '0 sem 0d' }}</span>
                             <span class="text-slate-400 text-xs">restantes</span>
                         </div>
                     </div>
@@ -195,6 +195,12 @@
         console.error('Monitor: slug não encontrado!', { config, pathname: window.location.pathname });
     }
     
+    // Dados da temporada ativa
+    const activeSeason = @json($activeSeason ? [
+        'ends_at' => $activeSeason->ends_at->format('Y-m-d'),
+        'starts_at' => $activeSeason->starts_at->format('Y-m-d'),
+    ] : null);
+    
     // Atualizar relógio a cada segundo
     function updateTime() {
         const now = new Date();
@@ -208,6 +214,64 @@
     }
     setInterval(updateTime, 1000);
     updateTime();
+    
+    // Atualizar contagem regressiva da temporada
+    function updateSeasonCountdown() {
+        if (!activeSeason) {
+            const remainingTimeEl = document.getElementById('season-remaining-time');
+            const progressCircle = document.getElementById('season-progress-circle');
+            if (remainingTimeEl) remainingTimeEl.textContent = '0 sem 0d';
+            if (progressCircle) progressCircle.style.strokeDashoffset = '351.86';
+            return;
+        }
+        
+        const now = new Date();
+        const endDate = new Date(activeSeason.ends_at + 'T23:59:59');
+        const startDate = new Date(activeSeason.starts_at + 'T00:00:00');
+        
+        // Calcular tempo restante
+        let diffMs = endDate - now;
+        if (diffMs < 0) {
+            diffMs = 0;
+        }
+        
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const weeks = Math.floor(diffDays / 7);
+        const days = diffDays % 7;
+        
+        // Atualizar texto
+        const remainingTimeEl = document.getElementById('season-remaining-time');
+        if (remainingTimeEl) {
+            remainingTimeEl.textContent = `${weeks} sem ${days}d`;
+        }
+        
+        // Calcular progresso percentual
+        const totalMs = endDate - startDate;
+        const elapsedMs = now - startDate;
+        let progress = 0;
+        
+        if (totalMs > 0) {
+            if (elapsedMs < 0) {
+                progress = 0;
+            } else if (elapsedMs >= totalMs) {
+                progress = 100;
+            } else {
+                progress = (elapsedMs / totalMs) * 100;
+            }
+        }
+        
+        // Atualizar círculo de progresso
+        const progressCircle = document.getElementById('season-progress-circle');
+        if (progressCircle) {
+            const circumference = 351.86; // 2 * PI * 56 (raio)
+            const offset = circumference - (progress / 100 * circumference);
+            progressCircle.style.strokeDashoffset = Math.max(0, Math.min(circumference, offset));
+        }
+    }
+    
+    // Atualizar a cada minuto
+    setInterval(updateSeasonCountdown, 60000);
+    updateSeasonCountdown();
 
     // Configurações do monitor
     const refreshInterval = config.refresh_interval || 30000;
@@ -557,7 +621,7 @@
         const sale = toastQueue.shift();
 
         const sellerName = sale?.seller?.name || 'Colaborador';
-        const occurrenceLabel = sale?.occurrence?.description || sale?.occurrence?.type || `${saleTermLabel} registrada`;
+        const occurrenceLabel = sale?.occurrence?.type || `${saleTermLabel} registrada`;
         const pointsLabel = formatPoints(sale?.points);
 
         const toast = document.createElement('div');

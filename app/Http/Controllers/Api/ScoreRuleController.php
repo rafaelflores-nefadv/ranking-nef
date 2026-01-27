@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ScoreRule;
+use App\Services\SectorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,8 +16,8 @@ class ScoreRuleController extends Controller
     public function index(): JsonResponse
     {
         $this->authorize('viewAny', ScoreRule::class);
-        
-        $scoreRules = ScoreRule::all();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest(request());
+        $scoreRules = ScoreRule::where('sector_id', $sectorId)->get();
         return response()->json($scoreRules);
     }
 
@@ -30,12 +31,14 @@ class ScoreRuleController extends Controller
         $validated = $request->validate([
             'ocorrencia' => 'required|string',
             'points' => 'required|numeric',
-            'description' => 'nullable|string',
-            'priority' => 'nullable|integer',
             'is_active' => 'nullable|boolean',
         ]);
 
-        $scoreRule = ScoreRule::create($validated);
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+        $scoreRule = ScoreRule::create(array_merge(
+            $validated,
+            ['sector_id' => $sectorId]
+        ));
         return response()->json($scoreRule, 201);
     }
 
@@ -46,6 +49,10 @@ class ScoreRuleController extends Controller
     {
         $scoreRule = ScoreRule::findOrFail($id);
         $this->authorize('view', $scoreRule);
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest(request());
+        if ($scoreRule->sector_id !== $sectorId) {
+            abort(403, 'Acesso negado');
+        }
         
         return response()->json($scoreRule);
     }
@@ -57,12 +64,14 @@ class ScoreRuleController extends Controller
     {
         $scoreRule = ScoreRule::findOrFail($id);
         $this->authorize('update', $scoreRule);
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+        if ($scoreRule->sector_id !== $sectorId) {
+            abort(403, 'Acesso negado');
+        }
 
         $validated = $request->validate([
             'ocorrencia' => 'sometimes|string',
             'points' => 'sometimes|numeric',
-            'description' => 'sometimes|string',
-            'priority' => 'sometimes|integer',
             'is_active' => 'sometimes|boolean',
         ]);
 
@@ -77,6 +86,10 @@ class ScoreRuleController extends Controller
     {
         $scoreRule = ScoreRule::findOrFail($id);
         $this->authorize('delete', $scoreRule);
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest(request());
+        if ($scoreRule->sector_id !== $sectorId) {
+            abort(403, 'Acesso negado');
+        }
         
         $scoreRule->delete();
 

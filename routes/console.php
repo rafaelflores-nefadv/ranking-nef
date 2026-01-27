@@ -25,6 +25,14 @@ Schedule::call(function () {
     ->withoutOverlapping()
     ->onOneServer();
 
+// Agendar verificação e renovação automática de temporadas
+Schedule::command('seasons:check-and-renew')
+    ->name('check-and-renew-seasons')
+    ->daily()
+    ->at('00:00')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 /*
  * Configuração do Cron (para produção):
  * 

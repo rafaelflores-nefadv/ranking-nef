@@ -48,6 +48,7 @@
                                 {{ $integration->is_active ? 'Ativo' : 'Inativo' }}
                             </span>
                         </div>
+                        <p class="text-slate-300 text-sm">Setor: {{ $integration->sector?->name ?? '—' }}</p>
                         @if($integration->description)
                         <p class="text-slate-300 mb-2">{{ $integration->description }}</p>
                         @endif

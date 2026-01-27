@@ -15,6 +15,30 @@
                 @csrf
                 @method('PUT')
 
+                @php
+                    $user = auth()->user();
+                    $isAdmin = $user && $user->role === 'admin';
+                @endphp
+
+                @if($isAdmin)
+                    <!-- Setor -->
+                    <div class="mb-4">
+                        <label for="sector_id" class="block text-sm font-medium text-slate-300 mb-2">Setor</label>
+                        <select id="sector_id" name="sector_id" disabled
+                            class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white opacity-70 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            @foreach($sectors ?? [] as $sector)
+                                <option value="{{ $sector->id }}" {{ $sector->id === $goal->sector_id ? 'selected' : '' }}>
+                                    {{ $sector->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <input type="hidden" name="sector_id" value="{{ $goal->sector_id }}">
+                        @error('sector_id')
+                            <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+                @endif
+
                 <!-- Escopo -->
                 <div class="mb-4">
                     <label for="scope" class="block text-sm font-medium text-slate-300 mb-2">Escopo da Meta</label>
@@ -174,6 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     scopeSelect.addEventListener('change', updateFields);
+    updateFields();
 });
 </script>
 @endsection

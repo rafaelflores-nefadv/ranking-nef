@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Monitor;
 use App\Models\Team;
+use App\Services\SectorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class MonitorController extends Controller
 {
@@ -21,7 +23,8 @@ class MonitorController extends Controller
             abort(403, 'Acesso negado');
         }
 
-        $monitors = Monitor::orderBy('name')->get();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+        $monitors = Monitor::where('sector_id', $sectorId)->orderBy('name')->get();
 
         return view('admin.monitors.index', compact('monitors'));
     }
@@ -37,7 +40,8 @@ class MonitorController extends Controller
             abort(403, 'Acesso negado');
         }
 
-        $teams = Team::orderBy('name')->get();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+        $teams = Team::where('sector_id', $sectorId)->orderBy('name')->get();
 
         return view('admin.monitors.create', compact('teams'));
     }
@@ -52,6 +56,7 @@ class MonitorController extends Controller
         if (!$user || $user->role !== 'admin') {
             abort(403, 'Acesso negado');
         }
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -62,7 +67,7 @@ class MonitorController extends Controller
             'refresh_interval' => 'nullable|integer|min:5000',
             'auto_rotate_teams' => 'boolean',
             'teams' => 'nullable|array',
-            'teams.*' => 'exists:teams,id',
+            'teams.*' => Rule::exists('teams', 'id')->where('sector_id', $sectorId),
             'notifications_enabled' => 'boolean',
             'sound_enabled' => 'boolean',
             'voice_enabled' => 'boolean',
@@ -103,6 +108,7 @@ class MonitorController extends Controller
         }
 
         $monitor = Monitor::create([
+            'sector_id' => $sectorId,
             'name' => $validated['name'],
             'slug' => $validated['slug'],
             'description' => $validated['description'] ?? null,
@@ -141,7 +147,7 @@ class MonitorController extends Controller
             abort(403, 'Acesso negado');
         }
 
-        $teams = Team::orderBy('name')->get();
+        $teams = Team::where('sector_id', $monitor->sector_id)->orderBy('name')->get();
         $settings = $monitor->getMergedSettings();
 
         return view('admin.monitors.edit', compact('monitor', 'teams', 'settings'));
@@ -157,6 +163,7 @@ class MonitorController extends Controller
         if (!$user || $user->role !== 'admin') {
             abort(403, 'Acesso negado');
         }
+        $sectorId = $monitor->sector_id;
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -167,7 +174,7 @@ class MonitorController extends Controller
             'refresh_interval' => 'nullable|integer|min:5000',
             'auto_rotate_teams' => 'boolean',
             'teams' => 'nullable|array',
-            'teams.*' => 'exists:teams,id',
+            'teams.*' => Rule::exists('teams', 'id')->where('sector_id', $sectorId),
             'notifications_enabled' => 'boolean',
             'sound_enabled' => 'boolean',
             'voice_enabled' => 'boolean',

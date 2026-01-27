@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Goal;
 use App\Models\User;
 use App\Services\PermissionService;
+use App\Services\SectorService;
 
 class GoalPolicy
 {
@@ -38,7 +39,7 @@ class GoalPolicy
     {
         // user pode ver todos
         if ($user->role === 'user') {
-            return true;
+            return $this->isInUserSector($user, $goal);
         }
         
         // admin pode ver todos
@@ -49,6 +50,9 @@ class GoalPolicy
         // supervisor só pode ver metas das suas equipes, vendedores das suas equipes ou globais
         if ($user->role === 'supervisor') {
             $allowedTeamIds = $user->getSupervisedTeamIds();
+            if (!$this->isInUserSector($user, $goal)) {
+                return false;
+            }
             
             // Metas globais: supervisor pode ver
             if ($goal->scope === 'global') {
@@ -62,9 +66,9 @@ class GoalPolicy
             
             // Metas de vendedor: verificar se o vendedor pertence a uma equipe permitida
             if ($goal->scope === 'seller' && $goal->seller_id) {
-                $goal->loadMissing('seller.team');
-                if ($goal->seller && $goal->seller->team_id) {
-                    return in_array($goal->seller->team_id, $allowedTeamIds);
+                $goal->loadMissing('seller.teams');
+                if ($goal->seller) {
+                    return $goal->seller->teams->pluck('id')->intersect($allowedTeamIds)->isNotEmpty();
                 }
             }
         }
@@ -107,6 +111,9 @@ class GoalPolicy
             }
             
             $allowedTeamIds = $user->getSupervisedTeamIds();
+            if (!$this->isInUserSector($user, $goal)) {
+                return false;
+            }
             
             // Metas globais: supervisor não pode editar
             if ($goal->scope === 'global') {
@@ -120,9 +127,9 @@ class GoalPolicy
             
             // Metas de vendedor: verificar se o vendedor pertence a uma equipe permitida
             if ($goal->scope === 'seller' && $goal->seller_id) {
-                $goal->loadMissing('seller.team');
-                if ($goal->seller && $goal->seller->team_id) {
-                    return in_array($goal->seller->team_id, $allowedTeamIds);
+                $goal->loadMissing('seller.teams');
+                if ($goal->seller) {
+                    return $goal->seller->teams->pluck('id')->intersect($allowedTeamIds)->isNotEmpty();
                 }
             }
         }
@@ -147,6 +154,9 @@ class GoalPolicy
             }
             
             $allowedTeamIds = $user->getSupervisedTeamIds();
+            if (!$this->isInUserSector($user, $goal)) {
+                return false;
+            }
             
             // Metas globais: supervisor não pode deletar
             if ($goal->scope === 'global') {
@@ -160,13 +170,23 @@ class GoalPolicy
             
             // Metas de vendedor: verificar se o vendedor pertence a uma equipe permitida
             if ($goal->scope === 'seller' && $goal->seller_id) {
-                $goal->loadMissing('seller.team');
-                if ($goal->seller && $goal->seller->team_id) {
-                    return in_array($goal->seller->team_id, $allowedTeamIds);
+                $goal->loadMissing('seller.teams');
+                if ($goal->seller) {
+                    return $goal->seller->teams->pluck('id')->intersect($allowedTeamIds)->isNotEmpty();
                 }
             }
         }
         
         return false;
+    }
+
+    private function isInUserSector(User $user, Goal $goal): bool
+    {
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        $sectorId = $user->sector_id ?? app(SectorService::class)->getDefaultSectorId();
+        return $goal->sector_id === $sectorId;
     }
 }

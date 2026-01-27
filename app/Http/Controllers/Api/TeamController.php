@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Team;
+use App\Services\SectorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,8 +19,12 @@ class TeamController extends Controller
         
         $user = $request->user();
         $allowedTeamIds = $user->getSupervisedTeamIds();
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
         
         $teamsQuery = Team::with('sellers');
+        if ($sectorId) {
+            $teamsQuery->where('sector_id', $sectorId);
+        }
         
         // Filtrar equipes baseado no papel do usuário
         if ($allowedTeamIds !== null) {
@@ -41,7 +46,8 @@ class TeamController extends Controller
             'name' => 'required|string',
         ]);
 
-        $team = Team::create($validated);
+        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+        $team = Team::create(array_merge($validated, ['sector_id' => $sectorId]));
         return response()->json($team, 201);
     }
 

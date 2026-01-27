@@ -14,6 +14,7 @@ class Score extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'sector_id',
         'seller_id',
         'score_rule_id',
         'points',
@@ -31,6 +32,11 @@ class Score extends Model
     public function seller(): BelongsTo
     {
         return $this->belongsTo(Seller::class);
+    }
+
+    public function sector(): BelongsTo
+    {
+        return $this->belongsTo(Sector::class);
     }
 
     public function scoreRule(): BelongsTo

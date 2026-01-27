@@ -73,6 +73,22 @@
                     @csrf
                     @method('PUT')
 
+                    <!-- Setor -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Setor *</label>
+                        <select name="sector_id" required
+                            class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            @foreach($sectors ?? [] as $sector)
+                                <option value="{{ $sector->id }}" {{ $sector->id === $apiIntegration->sector_id ? 'selected' : '' }}>
+                                    {{ $sector->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('sector_id')
+                            <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+
                     <!-- Nome -->
                     <div class="mb-4">
                         <label for="name" class="block text-sm font-medium text-slate-300 mb-2">Nome da Integração *</label>
@@ -130,13 +146,33 @@
 
             <!-- Tokens -->
             <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-xl font-bold text-white">Tokens de Acesso</h2>
-                    <form method="POST" action="{{ route('settings.api.tokens.generate', $apiIntegration) }}" class="inline-block">
+                <div class="flex flex-col gap-4 mb-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-bold text-white">Tokens de Acesso</h2>
+                    </div>
+                    <form method="POST" action="{{ route('settings.api.tokens.generate', $apiIntegration) }}" class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         @csrf
-                        <button type="submit" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm">
-                            Gerar Novo Token
-                        </button>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Setor</label>
+                            <div class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                                {{ $apiIntegration->sector?->name ?? '—' }}
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Identificador *</label>
+                            <select name="collaborator_identifier_type" required class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                                <option value="email">Email</option>
+                                <option value="external_code">Código externo</option>
+                            </select>
+                            @error('collaborator_identifier_type')
+                                <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div class="flex items-end">
+                            <button type="submit" class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm">
+                                Gerar Novo Token
+                            </button>
+                        </div>
                     </form>
                 </div>
 
@@ -148,6 +184,8 @@
                         <thead class="bg-slate-800/50">
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Token</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Setor</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Identificador</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Criado em</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Último uso</th>
@@ -159,6 +197,12 @@
                             <tr class="hover:bg-slate-800/30">
                                 <td class="px-4 py-4">
                                     <code class="text-xs text-slate-300 font-mono">{{ substr($token->token, 0, 20) }}...</code>
+                                </td>
+                                <td class="px-4 py-4 text-sm text-slate-300">
+                                    {{ $token->sector?->name ?? '—' }}
+                                </td>
+                                <td class="px-4 py-4 text-sm text-slate-300">
+                                    {{ $token->collaborator_identifier_type === 'external_code' ? 'Código externo' : 'Email' }}
                                 </td>
                                 <td class="px-4 py-4">
                                     <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $token->is_active ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400' }}">

@@ -72,7 +72,7 @@
                     <tbody id="notifications-table" class="divide-y divide-slate-800/60">
                         @forelse($notifications as $notification)
                             @php
-                                $occurrence = $notification->scoreRule?->description ?? $notification->scoreRule?->ocorrencia ?? 'Ocorrência registrada';
+                                $occurrence = $notification->scoreRule?->ocorrencia ?? 'Ocorrência registrada';
                                 $sellerName = $notification->seller?->name ?? 'Colaborador';
                                 $points = number_format($notification->points ?? 0, 2, ',', '.');
                                 $dateLabel = optional($notification->created_at)->format('d/m/Y H:i');

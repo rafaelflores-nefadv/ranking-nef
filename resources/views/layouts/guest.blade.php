@@ -71,5 +71,83 @@
     </head>
     <body class="font-sans antialiased bg-[#0a0e1a]">
         {{ $slot }}
+
+        @stack('scripts')
+        <script>
+            // Atualizar token CSRF periodicamente para evitar erro 419
+            document.addEventListener('DOMContentLoaded', function() {
+                let csrfUpdateInterval = null;
+                
+                // Função para atualizar o token CSRF
+                function updateCsrfToken() {
+                    fetch('/csrf-token', {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    }).then(response => {
+                        if (!response.ok) throw new Error('Failed to fetch CSRF token');
+                        return response.json();
+                    }).then(data => {
+                        if (data.token) {
+                            // Atualizar meta tag
+                            const metaTag = document.querySelector('meta[name="csrf-token"]');
+                            if (metaTag) {
+                                metaTag.setAttribute('content', data.token);
+                            }
+                            
+                            // Atualizar todos os inputs hidden com csrf token
+                            document.querySelectorAll('input[name="_token"]').forEach(input => {
+                                input.value = data.token;
+                            });
+                        }
+                    }).catch(error => {
+                        console.warn('Não foi possível atualizar o token CSRF:', error);
+                    });
+                }
+
+                // Atualizar token imediatamente ao carregar
+                updateCsrfToken();
+
+                // Atualizar token a cada 90 segundos (antes de expirar - sessão padrão é 120 min)
+                csrfUpdateInterval = setInterval(updateCsrfToken, 90000); // 90 segundos
+
+                // Atualizar token quando a página ganha foco (usuário volta para a aba)
+                document.addEventListener('visibilitychange', function() {
+                    if (!document.hidden) {
+                        updateCsrfToken();
+                    }
+                });
+
+                // Interceptar envio de formulários para verificar e atualizar token
+                document.querySelectorAll('form').forEach(form => {
+                    form.addEventListener('submit', function(e) {
+                        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                        const formToken = form.querySelector('input[name="_token"]')?.value;
+                        
+                        // Se os tokens não coincidem, atualizar antes de enviar
+                        if (token && formToken && token !== formToken) {
+                            form.querySelector('input[name="_token"]').value = token;
+                        } else if (!formToken && token) {
+                            // Se não há token no form mas há na meta tag, adicionar
+                            const hiddenInput = document.createElement('input');
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.name = '_token';
+                            hiddenInput.value = token;
+                            form.appendChild(hiddenInput);
+                        }
+                    }, { capture: true });
+                });
+
+                // Limpar intervalo quando a página for descarregada
+                window.addEventListener('beforeunload', function() {
+                    if (csrfUpdateInterval) {
+                        clearInterval(csrfUpdateInterval);
+                    }
+                });
+            });
+        </script>
     </body>
 </html>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\SectorService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -22,13 +23,22 @@ class UpdateGoalRequest extends FormRequest
      */
     public function rules(): array
     {
+        $goal = $this->route('goal');
+        $user = $this->user();
+        $sectorId = $user && $user->role === 'admin'
+            ? ($this->input('sector_id') ?: $goal->sector_id)
+            : ($user?->sector_id ?? app(SectorService::class)->getDefaultSectorId());
+
         return [
             'scope' => ['required', Rule::in(['global', 'team', 'seller'])],
+            'sector_id' => $user && $user->role === 'admin'
+                ? ['required', 'uuid', Rule::in([$goal->sector_id])]
+                : 'prohibited',
             'season_id' => 'required|uuid|exists:seasons,id',
             'team_id' => [
                 'nullable',
                 'uuid',
-                'exists:teams,id',
+                Rule::exists('teams', 'id')->where('sector_id', $sectorId),
                 'required_if:scope,team',
                 'prohibited_if:scope,global',
                 'prohibited_if:scope,seller',
@@ -36,7 +46,7 @@ class UpdateGoalRequest extends FormRequest
             'seller_id' => [
                 'nullable',
                 'uuid',
-                'exists:sellers,id',
+                Rule::exists('sellers', 'id')->where('sector_id', $sectorId),
                 'required_if:scope,seller',
                 'prohibited_if:scope,global',
                 'prohibited_if:scope,team',
@@ -57,12 +67,16 @@ class UpdateGoalRequest extends FormRequest
         return [
             'scope.required' => 'O escopo da meta é obrigatório.',
             'scope.in' => 'O escopo deve ser global, team ou seller.',
+            'sector_id.required' => 'Selecione um setor.',
+            'sector_id.in' => 'A meta não pertence ao setor selecionado.',
             'season_id.required' => 'A temporada é obrigatória.',
             'season_id.exists' => 'A temporada selecionada não existe.',
             'team_id.required_if' => 'A equipe é obrigatória quando o escopo é "team".',
             'team_id.prohibited_if' => 'A equipe não deve ser informada quando o escopo é "global" ou "seller".',
+            'team_id.exists' => 'A equipe não pertence ao setor selecionado.',
             'seller_id.required_if' => 'O vendedor é obrigatório quando o escopo é "seller".',
             'seller_id.prohibited_if' => 'O vendedor não deve ser informado quando o escopo é "global" ou "team".',
+            'seller_id.exists' => 'O vendedor não pertence ao setor selecionado.',
             'name.required' => 'O nome da meta é obrigatório.',
             'target_value.required' => 'O valor alvo é obrigatório.',
             'target_value.min' => 'O valor alvo deve ser maior ou igual a zero.',

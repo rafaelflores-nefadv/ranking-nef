@@ -5,11 +5,21 @@
 @section('content')
 <div class="min-h-screen bg-[#0a0e1a] p-6">
     <div class="max-w-7xl mx-auto">
+        @php
+            $user = auth()->user();
+            $isAdmin = $user && $user->role === 'admin';
+            $currentSectorName = $isAdmin && isset($sectorOptions)
+                ? optional($sectorOptions->firstWhere('id', $currentSectorId ?? null))->name
+                : ($user?->sector?->name ?? null);
+        @endphp
         <!-- Header -->
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-3xl font-bold text-white mb-2">Evolução de Pontuação</h1>
                 <p class="text-slate-400">Timeline de pontos por vendedor</p>
+                <span class="text-xs text-slate-400">
+                    Setor: <span class="text-slate-200">{{ $currentSectorName ?? 'Não selecionado' }}</span>
+                </span>
             </div>
             <div class="flex gap-2">
                 <a href="{{ route('reports.score-evolution', array_merge(request()->query(), ['export' => 'csv'])) }}" 
@@ -22,6 +32,19 @@
         <!-- Filtros -->
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 mb-6">
             <form method="GET" action="{{ route('reports.score-evolution') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                @if($isAdmin && isset($sectorOptions) && $sectorOptions->isNotEmpty())
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Setor</label>
+                        <select name="sector" id="sector-filter" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Selecione um setor</option>
+                            @foreach($sectorOptions as $sector)
+                                <option value="{{ $sector->id }}" {{ ($currentSectorId ?? null) === $sector->id ? 'selected' : '' }}>
+                                    {{ $sector->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-2">Vendedor</label>
                     <select name="seller" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
@@ -107,4 +130,18 @@
         </div>
     </div>
 </div>
+@if($isAdmin)
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sectorSelect = document.getElementById('sector-filter');
+        if (!sectorSelect) return;
+        const sellerSelect = document.querySelector('select[name="seller"]');
+        sectorSelect.addEventListener('change', () => {
+            if (sellerSelect) sellerSelect.value = '';
+            const form = sectorSelect.closest('form');
+            if (form) form.submit();
+        });
+    });
+    </script>
+@endif
 @endsection
