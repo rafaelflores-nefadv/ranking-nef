@@ -22,6 +22,7 @@ class ReviewApiOccurrencesScoresCommand extends Command
                             {--dry-run : Apenas exibe o que seria alterado, sem gravar}
                             {--limit=0 : Limite total de registros a processar (0 = sem limite)}
                             {--chunk=200 : Tamanho do lote por iteração}
+                            {--progress-every=200 : Exibir progresso a cada N registros}
                             {--only-errors : Processa apenas ocorrências com error_message}
                             {--include-processed : Inclui ocorrências já marcadas como processadas}';
 
@@ -39,6 +40,7 @@ class ReviewApiOccurrencesScoresCommand extends Command
         $chunkSize = max(1, (int) $this->option('chunk'));
         $onlyErrors = (bool) $this->option('only-errors');
         $includeProcessed = (bool) $this->option('include-processed');
+        $progressEvery = max(1, (int) $this->option('progress-every'));
 
         $this->info('Iniciando revisão de api_occurrences...');
         $this->line('Modo: ' . ($dryRun ? 'DRY-RUN (não grava)' : 'EXECUÇÃO (grava)'));
@@ -61,6 +63,7 @@ class ReviewApiOccurrencesScoresCommand extends Command
             'failed_missing_rule' => 0,
             'failed_team_mismatch' => 0,
         ];
+        $batchIndex = 0;
 
         while (true) {
             $query = ApiOccurrence::query();
@@ -88,11 +91,21 @@ class ReviewApiOccurrencesScoresCommand extends Command
             if ($occurrences->isEmpty()) {
                 break;
             }
+            $batchIndex++;
+            $this->line('Lote #' . $batchIndex . ' - registros no lote: ' . $occurrences->count());
 
             $updatedThisPass = 0;
 
             foreach ($occurrences as $occurrence) {
                 $stats['scanned']++;
+                if ($stats['scanned'] % $progressEvery === 0) {
+                    $this->line(
+                        'Progresso: scanned=' . $stats['scanned']
+                        . ' | applied=' . $stats['applied']
+                        . ' | linked=' . $stats['linked_existing_score']
+                        . ' | skipped=' . $stats['skipped_already_scored']
+                    );
+                }
 
                 try {
                     DB::beginTransaction();
@@ -199,7 +212,13 @@ class ReviewApiOccurrencesScoresCommand extends Command
                     DB::commit();
                     $updatedThisPass++;
                 } catch (\Exception $e) {
-                    DB::rollBack();
+                    try {
+                        DB::rollBack();
+                    } catch (\Exception $rollbackException) {
+                        // Conexão pode ter sido perdida; tenta reconectar para continuar
+                        DB::disconnect();
+                        DB::reconnect();
+                    }
                     Log::error('Erro ao revisar ocorrência', [
                         'occurrence_id' => $occurrence->id,
                         'error' => $e->getMessage(),
