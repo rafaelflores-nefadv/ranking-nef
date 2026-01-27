@@ -87,8 +87,19 @@ class ProcessApiOccurrencesJob implements ShouldQueue
                         throw new \RuntimeException('Regra inexistente no setor.');
                     }
 
+                    // Evitar duplicidade: se já existe score para esta ocorrência, marcar como processada
+                    if (Score::where('api_occurrence_id', $occurrence->id)->exists()) {
+                        $occurrence->update([
+                            'processed' => true,
+                            'error_message' => null,
+                        ]);
+                        DB::commit();
+                        continue;
+                    }
+
                     // Criar registro em scores
                     Score::create([
+                        'api_occurrence_id' => $occurrence->id,
                         'sector_id' => $occurrence->sector_id,
                         'seller_id' => $seller->id,
                         'score_rule_id' => $scoreRule->id,

@@ -14,6 +14,7 @@ class Score extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'api_occurrence_id',
         'sector_id',
         'seller_id',
         'score_rule_id',
