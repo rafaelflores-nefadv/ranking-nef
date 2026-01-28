@@ -456,6 +456,9 @@
     };
 
     const rotateTeamAndRefresh = () => {
+        if (voiceSyncState.state !== 'idle') {
+            return;
+        }
         if (!autoRotateTeams) {
             updateTeamChips();
             fetchDashboardData();
@@ -498,11 +501,11 @@
         }
     };
 
-    const startAutoRefresh = () => {
+    const startAutoRefresh = (initialRemainingMs = null) => {
         if (refreshTimer) clearInterval(refreshTimer);
         if (countdownTimer) clearInterval(countdownTimer);
         if (!isPaused) {
-            remainingMs = selectedInterval;
+            remainingMs = typeof initialRemainingMs === 'number' ? initialRemainingMs : selectedInterval;
             updateCountdownLabel();
             countdownTimer = setInterval(() => {
                 remainingMs -= 1000;
@@ -544,6 +547,9 @@
         chips.forEach((chip) => {
             chip.addEventListener('click', (event) => {
                 event.preventDefault();
+                if (voiceSyncState.state !== 'idle') {
+                    return;
+                }
                 currentTeamId = chip.dataset.teamId || null;
                 updateTeamChips();
                 fetchDashboardData();
@@ -870,230 +876,336 @@
         readVoiceBtn.classList.toggle('hover:bg-slate-700', !isSpeaking);
         readVoiceBtn.setAttribute('title', isSpeaking ? 'Leitura em andamento...' : 'Ler ranking por voz');
     };
-    
-    if (readVoiceBtn) {
-        // Configurações de voz do sistema (disponíveis no PHP)
-        const browserVoiceName = @json(App\Models\Config::where('key', 'notifications_voice_browser_name')->value('value') ?? '');
-    const systemVoiceEnabled = @json((App\Models\Config::where('key', 'notifications_voice_enabled')->value('value') ?? 'false') === 'true');
-    const voiceScope = @json($configs['notifications_voice_scope'] ?? 'global');
-        const voiceMode = @json(App\Models\Config::where('key', 'notifications_voice_mode')->value('value') ?? 'server');
-        
-        readVoiceBtn.addEventListener('click', async () => {
-            // Verificar se já está falando
-            if (window.isSpeaking) {
+
+    const voiceSyncState = {
+        state: 'idle',
+        previousAuto: null,
+    };
+
+    const setVoiceState = (nextState) => {
+        voiceSyncState.state = nextState;
+    };
+
+    const stopAutoRefreshTimers = () => {
+        if (refreshTimer) clearInterval(refreshTimer);
+        if (countdownTimer) clearInterval(countdownTimer);
+        refreshTimer = null;
+        countdownTimer = null;
+    };
+
+    const enterVoiceMode = () => {
+        voiceSyncState.previousAuto = {
+            isPaused,
+            remainingMs,
+            currentTeamId,
+        };
+        setVoiceState('voice_mode');
+        window.speechSynthesis.cancel();
+        isPaused = true;
+        stopAutoRefreshTimers();
+        updateToggleIcon();
+        updateCountdownLabel();
+        updateVoiceButtonState(true);
+    };
+
+    const exitVoiceMode = async () => {
+        const previous = voiceSyncState.previousAuto;
+        setVoiceState('idle');
+        if (previous) {
+            currentTeamId = previous.currentTeamId ?? null;
+            updateTeamChips();
+            await fetchDashboardData();
+            isPaused = previous.isPaused;
+            remainingMs = previous.remainingMs;
+        }
+        updateToggleIcon();
+        if (!isPaused) {
+            startAutoRefresh(remainingMs);
+        } else {
+            updateCountdownLabel();
+        }
+        updateVoiceButtonState(false);
+    };
+
+    const ensureVoicesLoaded = () => {
+        return new Promise((resolve) => {
+            if (window.speechSynthesis.getVoices().length > 0) {
+                resolve();
                 return;
             }
-            // Verificar se voz está habilitada - aceitar boolean, string "true", ou número 1
-            const config = window.DASHBOARD_CONFIG || {};
-            // Converter qualquer valor para boolean explícito
-            const rawVoiceEnabled = config.voice_enabled;
-            const monitorVoiceEnabled = rawVoiceEnabled === true || 
-                                       rawVoiceEnabled === 'true' || 
-                                       rawVoiceEnabled === 1 ||
-                                       rawVoiceEnabled === '1';
-            
-            console.log('Monitor: Verificando voz', {
-                config: config,
-                voice_enabled_raw: rawVoiceEnabled,
-                voice_enabled_type: typeof rawVoiceEnabled,
-                monitorVoiceEnabled,
-                systemVoiceEnabled,
-                voiceMode,
-                canUseVoice: monitorVoiceEnabled && systemVoiceEnabled && ['browser', 'both'].includes(voiceMode)
-            });
-            
-            // Verificações específicas para mensagens de erro claras
-            if (!monitorVoiceEnabled) {
+            window.speechSynthesis.addEventListener('voiceschanged', () => resolve(), { once: true });
+        });
+    };
+
+    // Configurações de voz do sistema (disponíveis no PHP)
+    const browserVoiceName = @json(App\Models\Config::where('key', 'notifications_voice_browser_name')->value('value') ?? '');
+    const systemVoiceEnabled = @json((App\Models\Config::where('key', 'notifications_voice_enabled')->value('value') ?? 'false') === 'true');
+    const voiceScope = @json($configs['notifications_voice_scope'] ?? 'global');
+    const voiceMode = @json(App\Models\Config::where('key', 'notifications_voice_mode')->value('value') ?? 'server');
+
+    const getBrowserVoice = () => {
+        if (!browserVoiceName) return null;
+        const voices = window.speechSynthesis.getVoices();
+        return voices.find(v => v.name === browserVoiceName) || null;
+    };
+
+    const speakText = (text) => {
+        return new Promise((resolve) => {
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voice = getBrowserVoice();
+            if (voice) {
+                utterance.voice = voice;
+            }
+            utterance.onend = () => resolve();
+            utterance.onerror = () => resolve();
+            updateVoiceButtonState(true);
+            window.speechSynthesis.speak(utterance);
+        });
+    };
+    
+    const fetchVoiceContent = async ({ scope, teamId = null }) => {
+                const url = new URL(`/monitor/${monitorSlug}/voice`, window.location.origin);
+                url.searchParams.set('scope', scope);
+                if (teamId) {
+                    url.searchParams.set('team_id', teamId);
+                }
+                const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.warn('Monitor: Voz indisponível', { scope, teamId, error: errorData });
+                    return null;
+                }
+                const result = await response.json();
+                return result?.content || null;
+            };
+
+    const startVoiceSyncFlow = async () => {
+                enterVoiceMode();
+                try {
+                    await ensureVoicesLoaded();
+
+                    setVoiceState('reading_general');
+                    currentTeamId = null;
+                    updateTeamChips();
+                    await fetchDashboardData();
+
+                    const generalText = await fetchVoiceContent({ scope: 'global' });
+                    if (!generalText) {
+                        showCustomAlert(
+                            'Sem ranking',
+                            'Não foi possível gerar a leitura do ranking geral no momento.',
+                            'warning'
+                        );
+                        return;
+                    }
+                    await speakText(generalText);
+
+                    const shouldIncludeTeams = ['teams', 'both'].includes(voiceScope);
+                    if (!shouldIncludeTeams) {
+                        return;
+                    }
+
+                    const teamQueue = teamIdsRotation.filter((teamId) => teamId !== null);
+                    for (const teamId of teamQueue) {
+                        setVoiceState('reading_team');
+                        currentTeamId = teamId;
+                        updateTeamChips();
+                        await fetchDashboardData();
+
+                        const teamText = await fetchVoiceContent({ scope: 'team', teamId });
+                        if (teamText) {
+                            await speakText(teamText);
+                        }
+                    }
+                } finally {
+                    await exitVoiceMode();
+                }
+            };
+
+    const startVoiceSequence = async ({ silent = false } = {}) => {
+        if (window.isSpeaking || voiceSyncState.state !== 'idle') {
+            return;
+        }
+        const config = window.DASHBOARD_CONFIG || {};
+        const rawVoiceEnabled = config.voice_enabled;
+        const monitorVoiceEnabled = rawVoiceEnabled === true ||
+            rawVoiceEnabled === 'true' ||
+            rawVoiceEnabled === 1 ||
+            rawVoiceEnabled === '1';
+
+        if (!monitorVoiceEnabled) {
+            if (!silent) {
                 showCustomAlert(
                     'Voz não habilitada no Monitor',
                     'A leitura por voz não está habilitada para este monitor. Para habilitar, edite o monitor e marque a opção "Leitura por voz habilitada".',
                     'warning'
                 );
-                return;
             }
-            
-            if (!systemVoiceEnabled) {
+            return;
+        }
+
+        if (!systemVoiceEnabled) {
+            if (!silent) {
                 showCustomAlert(
                     'Voz não habilitada no Sistema',
                     'A leitura por voz não está habilitada nas configurações gerais do sistema. Para habilitar, vá em Configurações > Notificações > Leitura por Voz e marque "Ativar leitura por voz".',
                     'warning'
                 );
-                return;
             }
-            
-            if (!['browser', 'both'].includes(voiceMode)) {
+            return;
+        }
+
+        if (!['browser', 'both'].includes(voiceMode)) {
+            if (!silent) {
                 showCustomAlert(
                     'Modo de Voz Incompatível',
                     'O modo de voz do sistema está configurado como "Servidor" apenas, o que não permite leitura no navegador. Para usar a leitura no monitor, configure o modo de voz como "Navegador" ou "Servidor + Navegador" nas configurações gerais.',
                     'warning'
                 );
-                return;
             }
+            return;
+        }
 
-            if (!('speechSynthesis' in window)) {
+        if (!('speechSynthesis' in window)) {
+            if (!silent) {
                 alert('Seu navegador não suporta leitura por voz (SpeechSynthesis).');
-                return;
             }
-            
-            // Desabilitar botão imediatamente ao iniciar
-            updateVoiceButtonState(true);
+            return;
+        }
 
-            // Função para obter voz configurada
-            const getVoice = () => {
-                if (!browserVoiceName) return null;
-                const voices = window.speechSynthesis.getVoices();
-                return voices.find(v => v.name === browserVoiceName) || null;
-            };
-
-            // Função para reproduzir texto
-            const speakText = (text) => {
-                return new Promise((resolve) => {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    const voice = getVoice();
-                    
-                    if (voice) {
-                        utterance.voice = voice;
-                    }
-
-                    utterance.onend = () => {
-                        resolve();
-                    };
-                    utterance.onerror = () => {
-                        resolve();
-                    };
-
-                    // Desabilitar botão ao começar a falar
-                    updateVoiceButtonState(true);
-                    
-                    window.speechSynthesis.speak(utterance);
-                });
-            };
-
-            // Buscar notificações de voz recentes
-            try {
-                const voiceResponse = await fetch('/notifications/voice/recent?limit=10');
-                if (!voiceResponse.ok) {
-                    console.error('Monitor: Erro ao buscar leitura por voz');
-                    alert('Erro ao buscar leituras de voz disponíveis.');
-                    return;
-                }
-
-                const voiceResult = await voiceResponse.json();
-                const items = voiceResult?.data || [];
-
-                if (items.length === 0) {
-                    // Se não houver notificações salvas, gerar leitura atual do ranking
-                    console.log('Monitor: Nenhuma notificação de voz encontrada, gerando leitura atual...');
-                    
-                    try {
-                        // Buscar leitura do ranking geral e todas as equipes (não apenas a selecionada)
-                        const voiceTextResponse = await fetch(`/monitor/${monitorSlug}/voice?scope=both`, {
-                            headers: { 'Accept': 'application/json' },
-                        });
-                        
-                        if (!voiceTextResponse.ok) {
-                            const errorData = await voiceTextResponse.json().catch(() => ({}));
-                            updateVoiceButtonState(false);
-                            showCustomAlert(
-                                'Erro ao gerar leitura',
-                                errorData.error || 'Não foi possível gerar a leitura do ranking. Tente novamente.',
-                                'error'
-                            );
-                            return;
-                        }
-                        
-                        const voiceTextResult = await voiceTextResponse.json();
-                        
-                        if (voiceTextResult?.content) {
-                            // Garantir que as vozes estejam carregadas
-                            if (window.speechSynthesis.getVoices().length === 0) {
-                                window.speechSynthesis.addEventListener('voiceschanged', async () => {
-                                    await speakText(voiceTextResult.content);
-                                    updateVoiceButtonState(false);
-                                }, { once: true });
-                            } else {
-                                await speakText(voiceTextResult.content);
-                                updateVoiceButtonState(false);
-                            }
-                        } else {
-                            updateVoiceButtonState(false);
-                            showCustomAlert(
-                                'Erro ao gerar leitura',
-                                'Não foi possível gerar o texto do ranking.',
-                                'error'
-                            );
-                        }
-                    } catch (error) {
-                        console.error('Monitor: Erro ao gerar leitura por voz:', error);
-                        updateVoiceButtonState(false);
-                        showCustomAlert(
-                            'Erro ao gerar leitura',
-                            'Ocorreu um erro ao tentar gerar a leitura do ranking. Verifique o console para mais detalhes.',
-                            'error'
-                        );
-                    }
-                    return;
-                }
-
-                const shouldIncludeTeams = ['teams', 'both'].includes(voiceScope);
-                const hasTeamItems = items.some((item) => item?.scope === 'team');
-
-                if (shouldIncludeTeams && !hasTeamItems) {
-                    try {
-                        const voiceTextResponse = await fetch(`/monitor/${monitorSlug}/voice?scope=both`, {
-                            headers: { 'Accept': 'application/json' },
-                        });
-
-                        if (voiceTextResponse.ok) {
-                            const voiceTextResult = await voiceTextResponse.json();
-                            if (voiceTextResult?.content) {
-                                if (window.speechSynthesis.getVoices().length === 0) {
-                                    window.speechSynthesis.addEventListener('voiceschanged', async () => {
-                                        await speakText(voiceTextResult.content);
-                                        updateVoiceButtonState(false);
-                                    }, { once: true });
-                                } else {
-                                    await speakText(voiceTextResult.content);
-                                    updateVoiceButtonState(false);
-                                }
-                                return;
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Monitor: Falha ao buscar leitura por voz completa:', error);
-                    }
-                }
-
-                // Garantir que as vozes estejam carregadas
-                if (window.speechSynthesis.getVoices().length === 0) {
-                    window.speechSynthesis.addEventListener('voiceschanged', async () => {
-                        await speakAllVoiceItems(items);
-                    }, { once: true });
-                } else {
-                    await speakAllVoiceItems(items);
-                }
-
-                async function speakAllVoiceItems(itemsToSpeak) {
-                    try {
-                        // Ordenar do mais antigo para o mais recente (primeiro a ser lido)
-                        const ordered = itemsToSpeak.slice().reverse();
-                        
-                        for (const item of ordered) {
-                            if (item?.content) {
-                                await speakText(item.content);
-                            }
-                        }
-                    } finally {
-                        // Reabilitar botão ao terminar
-                        updateVoiceButtonState(false);
-                    }
-                }
-            } catch (error) {
-                console.error('Monitor: Erro ao executar leitura por voz:', error);
-                alert('Erro ao executar leitura por voz. Verifique o console para mais detalhes.');
+        try {
+            await startVoiceSyncFlow();
+        } catch (error) {
+            console.error('Monitor: Erro ao executar leitura por voz sincronizada:', error);
+            if (!silent) {
+                showCustomAlert(
+                    'Erro ao executar leitura',
+                    'Ocorreu um erro ao tentar sincronizar a leitura. Verifique o console para mais detalhes.',
+                    'error'
+                );
             }
+            await exitVoiceMode();
+        }
+    };
+
+    if (readVoiceBtn) {
+        readVoiceBtn.addEventListener('click', async () => {
+            await startVoiceSequence({ silent: false });
         });
     }
+
+    // Leitura por voz automática (scheduler) + log de countdown
+    const voiceAutoState = {
+        lastVoiceTimestamp: localStorage.getItem(`monitor_${monitorSlug}_voice_last_timestamp`) || null,
+        lastTriggeredNextRunAt: null,
+        hasInitialized: false,
+        statusTimer: null,
+        pollingTimer: null,
+    };
+
+    const getMonitorVoiceEnabled = () => {
+        const rawVoiceEnabled = (window.DASHBOARD_CONFIG || {}).voice_enabled;
+        return rawVoiceEnabled === true ||
+            rawVoiceEnabled === 'true' ||
+            rawVoiceEnabled === 1 ||
+            rawVoiceEnabled === '1';
+    };
+
+    const canUseBrowserVoice = () => {
+        return getMonitorVoiceEnabled() &&
+            systemVoiceEnabled &&
+            ['browser', 'both'].includes(voiceMode) &&
+            ('speechSynthesis' in window);
+    };
+
+    const fetchVoiceStatus = async () => {
+        try {
+            const response = await fetch(`/monitor/${monitorSlug}/voice/status`, {
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!response.ok) return null;
+            return await response.json();
+        } catch (error) {
+            console.warn('Monitor: Erro ao obter status da voz:', error);
+            return null;
+        }
+    };
+
+    const logVoiceCountdown = (status) => {
+        if (!status) return;
+        if (!status.enabled) {
+            console.log('Leitura por voz: desativada nas configurações.');
+            return;
+        }
+        const nextRunLabel = status.next_run_at
+            ? new Date(status.next_run_at).toLocaleString('pt-BR')
+            : 'indefinido';
+        if (!status.has_last_run) {
+            console.log(`Leitura por voz: aguardando primeira execução (próxima em ${nextRunLabel}).`);
+            return;
+        }
+        if ((status.overdue_seconds || 0) > 0) {
+            const overdueMinutes = Math.ceil(status.overdue_seconds / 60);
+            console.log(`Leitura por voz: atrasada ${overdueMinutes} min (próxima em ${nextRunLabel}).`);
+            return;
+        }
+        const remainingMinutes = Math.ceil((status.remaining_seconds || 0) / 60);
+        console.log(`Leitura por voz: faltam ${remainingMinutes} min (próxima em ${nextRunLabel}).`);
+    };
+
+    const checkVoicePendingAndStart = async () => {
+        if (!canUseBrowserVoice()) {
+            return;
+        }
+        if (document.visibilityState !== 'visible') {
+            return;
+        }
+        if (voiceSyncState.state !== 'idle' || window.isSpeaking) {
+            return;
+        }
+        const status = await fetchVoiceStatus();
+        if (!status || !status.enabled) {
+            return;
+        }
+        if (!voiceAutoState.hasInitialized) {
+            voiceAutoState.hasInitialized = true;
+            return;
+        }
+        if (!status.has_last_run) {
+            return;
+        }
+        const isDue = (status.remaining_seconds || 0) <= 0 || (status.overdue_seconds || 0) > 0;
+        if (!isDue) {
+            return;
+        }
+        if (voiceAutoState.lastTriggeredNextRunAt === status.next_run_at) {
+            return;
+        }
+        voiceAutoState.lastTriggeredNextRunAt = status.next_run_at || null;
+        await startVoiceSequence({ silent: true });
+    };
+
+    const startVoiceStatusLogging = () => {
+        const tick = async () => {
+            const status = await fetchVoiceStatus();
+            logVoiceCountdown(status);
+        };
+        tick();
+        if (voiceAutoState.statusTimer) clearInterval(voiceAutoState.statusTimer);
+        voiceAutoState.statusTimer = setInterval(tick, 60000);
+    };
+
+    const startVoiceAutoPolling = () => {
+        const tick = async () => {
+            await checkVoicePendingAndStart();
+        };
+        tick();
+        if (voiceAutoState.pollingTimer) clearInterval(voiceAutoState.pollingTimer);
+        voiceAutoState.pollingTimer = setInterval(tick, 60000);
+    };
+
+    startVoiceStatusLogging();
+    startVoiceAutoPolling();
 
     // Controle de polling de notificações com detecção de visibilidade
     let salesPollingInterval = null;

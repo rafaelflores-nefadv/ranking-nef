@@ -24,7 +24,7 @@ class User extends Authenticatable
         'sector_id',
         'name',
         'email',
-        'avatar',
+        'profile_photo_path',
         'password',
         'role',
         'is_active',
@@ -57,6 +57,11 @@ class User extends Authenticatable
     public function sector(): BelongsTo
     {
         return $this->belongsTo(Sector::class);
+    }
+
+    public function getProfilePhotoPathAttribute(?string $value): ?string
+    {
+        return $value ?: ($this->attributes['avatar'] ?? null);
     }
 
     /**

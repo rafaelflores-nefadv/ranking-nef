@@ -19,7 +19,7 @@ class Seller extends Model
         'name',
         'email',
         'external_code',
-        'avatar',
+        'profile_photo_path',
         'points',
         'status',
     ];
@@ -61,5 +61,10 @@ class Seller extends Model
     public function scores(): HasMany
     {
         return $this->hasMany(Score::class);
+    }
+
+    public function getProfilePhotoPathAttribute(?string $value): ?string
+    {
+        return $value ?: ($this->attributes['avatar'] ?? null);
     }
 }

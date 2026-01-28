@@ -16,7 +16,13 @@
                 @method('PUT')
 
                 <!-- Avatar -->
-                <x-avatar-upload name="avatar" :currentAvatar="$user->avatar" label="Foto de Perfil" />
+                <x-avatar-upload
+                    name="profile_photo"
+                    :currentPath="$user->profile_photo_path"
+                    :fallbackName="$user->name"
+                    :allowRemove="true"
+                    label="Foto de Perfil"
+                />
 
                 <!-- Nome -->
                 <div class="mb-4">

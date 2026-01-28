@@ -11,7 +11,13 @@
         
         <div class="flex items-end justify-center gap-8 relative z-10">
             @if(isset($top3[1]))
-                @php $seller2 = $top3[1]; $initial2 = strtoupper(substr($seller2['name'], 0, 1)); @endphp
+                @php
+                    $seller2 = $top3[1];
+                    $photoPath2 = $seller2['profile_photo_path'] ?? null;
+                    $avatar2 = !empty($photoPath2)
+                        ? asset('storage/' . $photoPath2)
+                        : \App\Support\AvatarHelper::dataUri($seller2['name'], 128);
+                @endphp
                 <div class="relative z-20 podium-card podium-second">
                     <div class="relative w-56 h-56 flex items-center justify-center">
                         <div class="absolute inset-0 bg-gradient-to-b from-cyan-400 via-cyan-500 to-cyan-600 opacity-20 blur-2xl shadow-cyan-500/50 shadow-2xl"></div>
@@ -28,9 +34,7 @@
                         </svg>
                         <div class="absolute inset-0 flex flex-col items-center justify-center">
                             <div class="w-20 h-20 rounded-full overflow-hidden border-4 border-cyan-400 mb-3">
-                                <div class="w-full h-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-                                    <span class="text-2xl font-bold text-white">{{ $initial2 }}</span>
-                                </div>
+                                <img src="{{ $avatar2 }}" alt="{{ $seller2['name'] }}" class="w-full h-full object-cover">
                             </div>
                             <h3 class="text-white font-bold text-lg text-center px-4 mb-1">{{ $seller2['name'] }}</h3>
                             <p class="text-white/90 font-semibold text-sm">{{ number_format($seller2['points'], 0, ',', '.') }} Pontos</p>
@@ -43,7 +47,13 @@
             @endif
             
             @if(isset($top3[0]))
-                @php $seller1 = $top3[0]; $initial1 = strtoupper(substr($seller1['name'], 0, 1)); @endphp
+                @php
+                    $seller1 = $top3[0];
+                    $photoPath1 = $seller1['profile_photo_path'] ?? null;
+                    $avatar1 = !empty($photoPath1)
+                        ? asset('storage/' . $photoPath1)
+                        : \App\Support\AvatarHelper::dataUri($seller1['name'], 128);
+                @endphp
                 <div class="relative z-30 podium-card podium-first" style="transform: scale(1.2);">
                     <div class="relative w-64 h-64 flex items-center justify-center">
                         <div class="absolute inset-0 bg-gradient-to-b from-yellow-400 via-amber-500 to-yellow-600 opacity-20 blur-2xl shadow-yellow-500/50 shadow-2xl"></div>
@@ -66,9 +76,7 @@
                                 </svg>
                             </div>
                             <div class="w-20 h-20 rounded-full overflow-hidden border-4 border-yellow-400 mb-3">
-                                <div class="w-full h-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-                                    <span class="text-2xl font-bold text-white">{{ $initial1 }}</span>
-                                </div>
+                                <img src="{{ $avatar1 }}" alt="{{ $seller1['name'] }}" class="w-full h-full object-cover">
                             </div>
                             <h3 class="text-white font-bold text-lg text-center px-4 mb-1">{{ $seller1['name'] }}</h3>
                             <p class="text-white/90 font-semibold text-sm">{{ number_format($seller1['points'], 0, ',', '.') }} Pontos</p>
@@ -81,7 +89,13 @@
             @endif
             
             @if(isset($top3[2]))
-                @php $seller3 = $top3[2]; $initial3 = strtoupper(substr($seller3['name'], 0, 1)); @endphp
+                @php
+                    $seller3 = $top3[2];
+                    $photoPath3 = $seller3['profile_photo_path'] ?? null;
+                    $avatar3 = !empty($photoPath3)
+                        ? asset('storage/' . $photoPath3)
+                        : \App\Support\AvatarHelper::dataUri($seller3['name'], 128);
+                @endphp
                 <div class="relative z-20 podium-card podium-third">
                     <div class="relative w-56 h-56 flex items-center justify-center">
                         <div class="absolute inset-0 bg-gradient-to-b from-orange-400 via-orange-500 to-red-500 opacity-20 blur-2xl shadow-orange-500/50 shadow-2xl"></div>
@@ -98,9 +112,7 @@
                         </svg>
                         <div class="absolute inset-0 flex flex-col items-center justify-center">
                             <div class="w-20 h-20 rounded-full overflow-hidden border-4 border-orange-400 mb-3">
-                                <div class="w-full h-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-                                    <span class="text-2xl font-bold text-white">{{ $initial3 }}</span>
-                                </div>
+                                <img src="{{ $avatar3 }}" alt="{{ $seller3['name'] }}" class="w-full h-full object-cover">
                             </div>
                             <h3 class="text-white font-bold text-lg text-center px-4 mb-1">{{ $seller3['name'] }}</h3>
                             <p class="text-white/90 font-semibold text-sm">{{ number_format($seller3['points'], 0, ',', '.') }} Pontos</p>

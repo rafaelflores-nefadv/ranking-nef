@@ -58,9 +58,7 @@
                         <tr class="hover:bg-slate-800/30">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
-                                    <img src="{{ $user->avatar ? asset('storage/' . $user->avatar) : 'https://ui-avatars.com/api/?name=' . urlencode($user->name) . '&background=6366f1&color=fff&size=64' }}" 
-                                         alt="{{ $user->name }}" 
-                                         class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">
+                                    <x-avatar :name="$user->name" :path="$user->profile_photo_path" size="w-10 h-10" pixelSize="96" />
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">

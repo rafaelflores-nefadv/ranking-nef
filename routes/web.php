@@ -32,6 +32,7 @@ Route::get('/csrf-token', function() {
 Route::get('/monitor/{slug}', [MonitorController::class, 'show'])->name('monitor.show');
 Route::get('/monitor/{slug}/data', [MonitorController::class, 'data'])->name('monitor.data');
 Route::get('/monitor/{slug}/voice', [MonitorController::class, 'voiceText'])->name('monitor.voice');
+Route::get('/monitor/{slug}/voice/status', [MonitorController::class, 'voiceStatus'])->name('monitor.voice.status');
 
 // Rotas públicas para notificações do monitor (sem autenticação)
 Route::get('/scores/recent', [ScoreController::class, 'recent'])->name('scores.recent');

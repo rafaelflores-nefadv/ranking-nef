@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Services\SectorService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use App\Rules\Base64Image;
 
 class StoreUserRequest extends FormRequest
 {
@@ -26,11 +27,15 @@ class StoreUserRequest extends FormRequest
     {
         $sectorId = $this->input('sector_id') ?: app(SectorService::class)->getDefaultSectorId();
 
+        $maxKb = (int) config('avatars.max_kb', 2048);
+        $allowedMimes = (array) config('avatars.allowed_mimes', []);
+
         $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'avatar_base64' => 'nullable|string',
+            'profile_photo' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:' . $maxKb,
+            'profile_photo_base64' => ['nullable', new Base64Image($allowedMimes, $maxKb)],
+            'remove_profile_photo' => 'nullable|boolean',
             'password' => [
                 'required',
                 'min:8',

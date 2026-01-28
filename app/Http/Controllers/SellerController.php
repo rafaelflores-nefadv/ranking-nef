@@ -11,12 +11,16 @@ use App\Models\Sector;
 use App\Models\Team;
 use App\Models\Season;
 use App\Services\SectorService;
+use App\Services\ProfilePhotoService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
 class SellerController extends Controller
 {
+    public function __construct(
+        private ProfilePhotoService $profilePhotoService
+    ) {}
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', Seller::class);
@@ -95,11 +99,11 @@ class SellerController extends Controller
         $teams = $data['teams'] ?? [];
         unset($data['teams']);
         
-        // Processar upload de avatar
-        if ($request->hasFile('avatar')) {
-            $data['avatar'] = $this->storeAvatar($request->file('avatar'));
-        } elseif ($request->filled('avatar_base64')) {
-            $data['avatar'] = $this->storeAvatarFromBase64($request->input('avatar_base64'));
+        // Processar upload de foto
+        if ($request->hasFile('profile_photo')) {
+            $data['profile_photo_path'] = $this->profilePhotoService->storeUploadedPhoto($request->file('profile_photo'));
+        } elseif ($request->filled('profile_photo_base64')) {
+            $data['profile_photo_path'] = $this->profilePhotoService->storeBase64Photo($request->input('profile_photo_base64'));
         }
         
         $data['sector_id'] = $sectorId;
@@ -169,19 +173,19 @@ class SellerController extends Controller
         $teams = $data['teams'] ?? [];
         unset($data['teams']);
         
-        // Processar upload de avatar
-        if ($request->hasFile('avatar')) {
-            // Remover avatar antigo se existir
-            if ($seller->avatar) {
-                Storage::disk('public')->delete($seller->avatar);
-            }
-            $data['avatar'] = $this->storeAvatar($request->file('avatar'));
-        } elseif ($request->filled('avatar_base64')) {
-            // Remover avatar antigo se existir
-            if ($seller->avatar) {
-                Storage::disk('public')->delete($seller->avatar);
-            }
-            $data['avatar'] = $this->storeAvatarFromBase64($request->input('avatar_base64'));
+        $removePhoto = $request->boolean('remove_profile_photo');
+        $existingPhoto = $seller->getRawOriginal('profile_photo_path') ?: $seller->getRawOriginal('avatar');
+
+        // Processar upload de foto
+        if ($request->hasFile('profile_photo')) {
+            $this->profilePhotoService->deleteIfExists($existingPhoto);
+            $data['profile_photo_path'] = $this->profilePhotoService->storeUploadedPhoto($request->file('profile_photo'));
+        } elseif ($request->filled('profile_photo_base64')) {
+            $this->profilePhotoService->deleteIfExists($existingPhoto);
+            $data['profile_photo_path'] = $this->profilePhotoService->storeBase64Photo($request->input('profile_photo_base64'));
+        } elseif ($removePhoto) {
+            $this->profilePhotoService->deleteIfExists($existingPhoto);
+            $data['profile_photo_path'] = null;
         }
         
         $seller->update($data);
@@ -193,36 +197,6 @@ class SellerController extends Controller
             ->with('success', 'Colaborador atualizado com sucesso!');
     }
     
-    /**
-     * Armazenar avatar de arquivo
-     */
-    private function storeAvatar($file): string
-    {
-        $path = $file->store('avatars', 'public');
-        return $path;
-    }
-    
-    /**
-     * Armazenar avatar de base64 (webcam)
-     */
-    private function storeAvatarFromBase64($base64): string
-    {
-        // Remover prefixo data:image/...;base64,
-        $image = preg_replace('/^data:image\/\w+;base64,/', '', $base64);
-        $image = base64_decode($image);
-        
-        // Gerar nome único
-        $filename = 'avatars/' . uniqid() . '_' . time() . '.jpg';
-        
-        // Garantir que o diretório existe
-        Storage::disk('public')->makeDirectory('avatars');
-        
-        // Salvar arquivo
-        Storage::disk('public')->put($filename, $image);
-        
-        return $filename;
-    }
-
     public function destroy(Seller $seller)
     {
         $this->authorize('delete', $seller);

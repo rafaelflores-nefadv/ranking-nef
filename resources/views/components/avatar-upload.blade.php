@@ -1,4 +1,18 @@
-@props(['name' => 'avatar', 'currentAvatar' => null, 'label' => 'Foto de Perfil'])
+@props([
+    'name' => 'profile_photo',
+    'currentPath' => null,
+    'label' => 'Foto de Perfil',
+    'fallbackName' => null,
+    'allowRemove' => false,
+    'removeName' => null,
+])
+
+@php
+    $displayName = $fallbackName ?? old('name', '');
+    $fallbackSrc = \App\Support\AvatarHelper::dataUri($displayName, 128);
+    $currentSrc = $currentPath ? asset('storage/' . $currentPath) : $fallbackSrc;
+    $removeFieldName = $removeName ?? ('remove_' . $name);
+@endphp
 
 <div class="mb-4">
     <label class="block text-sm font-medium text-slate-300 mb-2">{{ $label }}</label>
@@ -7,7 +21,8 @@
     <div class="mb-4 flex items-center gap-4">
         <div class="relative">
             <img id="avatar-preview-{{ $name }}" 
-                 src="{{ $currentAvatar ? asset('storage/' . $currentAvatar) : 'https://ui-avatars.com/api/?name=' . urlencode(old('name', '')) . '&background=6366f1&color=fff&size=128' }}" 
+                 src="{{ $currentSrc }}" 
+                 data-fallback-src="{{ $fallbackSrc }}"
                  alt="Preview" 
                  class="w-24 h-24 rounded-full object-cover border-2 border-slate-600">
             <div id="avatar-loading-{{ $name }}" class="hidden absolute inset-0 bg-slate-900/50 rounded-full flex items-center justify-center">
@@ -28,6 +43,13 @@
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors">
                 Tirar Foto
             </button>
+            @if($allowRemove)
+                <button type="button"
+                        onclick="removeAvatar('{{ $name }}')"
+                        class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm transition-colors">
+                    Remover Foto
+                </button>
+            @endif
         </div>
     </div>
 
@@ -35,7 +57,7 @@
     <input type="file" 
            id="avatar-input-{{ $name }}" 
            name="{{ $name }}" 
-           accept="image/*" 
+           accept="image/jpeg,image/png,image/webp" 
            class="hidden"
            onchange="handleFileSelect(event, '{{ $name }}')">
     
@@ -44,7 +66,15 @@
            id="avatar-base64-{{ $name }}" 
            name="{{ $name }}_base64">
 
+    <input type="hidden"
+           id="avatar-remove-{{ $name }}"
+           name="{{ $removeFieldName }}"
+           value="0">
+
     @error($name)
+        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+    @enderror
+    @error($name . '_base64')
         <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
     @enderror
 </div>
@@ -105,6 +135,7 @@
                 updateAvatarPreview(e.target.result, name);
                 // Limpar base64 da webcam se houver
                 document.getElementById('avatar-base64-' + name).value = '';
+                markAvatarNotRemoved(name);
             };
             reader.readAsDataURL(file);
         }
@@ -167,6 +198,7 @@
         
         // Limpar input de arquivo
         document.getElementById('avatar-input-' + name).value = '';
+        markAvatarNotRemoved(name);
         
         closeWebcam(name);
     }
@@ -174,6 +206,27 @@
     function updateAvatarPreview(imageSrc, name) {
         const preview = document.getElementById('avatar-preview-' + name);
         preview.src = imageSrc;
+    }
+
+    function removeAvatar(name) {
+        const preview = document.getElementById('avatar-preview-' + name);
+        const fallbackSrc = preview?.getAttribute('data-fallback-src');
+        if (fallbackSrc) {
+            preview.src = fallbackSrc;
+        }
+        document.getElementById('avatar-base64-' + name).value = '';
+        document.getElementById('avatar-input-' + name).value = '';
+        const removeInput = document.getElementById('avatar-remove-' + name);
+        if (removeInput) {
+            removeInput.value = '1';
+        }
+    }
+
+    function markAvatarNotRemoved(name) {
+        const removeInput = document.getElementById('avatar-remove-' + name);
+        if (removeInput) {
+            removeInput.value = '0';
+        }
     }
 </script>
 @endpush

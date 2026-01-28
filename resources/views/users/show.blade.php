@@ -13,9 +13,7 @@
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
             <!-- Foto de Perfil -->
             <div class="mb-6 flex items-center justify-center">
-                <img src="{{ $user->avatar ? asset('storage/' . $user->avatar) : 'https://ui-avatars.com/api/?name=' . urlencode($user->name) . '&background=6366f1&color=fff&size=200' }}" 
-                     alt="{{ $user->name }}" 
-                     class="w-32 h-32 rounded-full object-cover border-4 border-slate-600 shadow-lg">
+                <x-avatar :name="$user->name" :path="$user->profile_photo_path" size="w-32 h-32" pixelSize="200" class="border-4 shadow-lg" />
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

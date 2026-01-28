@@ -15,7 +15,7 @@
                 @csrf
 
                 <!-- Avatar -->
-                <x-avatar-upload name="avatar" label="Foto de Perfil" />
+                <x-avatar-upload name="profile_photo" label="Foto de Perfil" />
 
                 <!-- Nome -->
                 <div class="mb-4">

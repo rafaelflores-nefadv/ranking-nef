@@ -190,11 +190,34 @@
     let countdown = refreshInterval;
     let isRefreshing = true;
     let countdownInterval = null;
+    let teamRotationInterval = null;
     let soundEnabled = {{ ($dashboardConfig['sound_enabled'] ?? false) ? 'true' : 'false' }};
     let teamRotationEnabled = {{ ($dashboardConfig['team_rotation_enabled'] ?? false) ? 'true' : 'false' }};
     let currentTeamIndex = 0;
     const teams = @json($teams ?? []);
     const notificationEventsConfig = @json($notificationEventsConfig ?? []);
+    const voiceScope = @json($configs['notifications_voice_scope'] ?? 'global');
+    let voiceButtonEl = null;
+
+    window.isSpeaking = false;
+
+    const voiceSyncState = {
+        state: 'idle',
+        previousAuto: null,
+    };
+
+    const setVoiceState = (nextState) => {
+        voiceSyncState.state = nextState;
+    };
+
+    const updateVoiceButtonState = (isSpeaking) => {
+        if (!voiceButtonEl) return;
+        window.isSpeaking = isSpeaking;
+        voiceButtonEl.disabled = isSpeaking;
+        voiceButtonEl.classList.toggle('opacity-50', isSpeaking);
+        voiceButtonEl.classList.toggle('cursor-not-allowed', isSpeaking);
+        voiceButtonEl.setAttribute('title', isSpeaking ? 'Leitura em andamento...' : 'Ler ranking por voz');
+    };
 
     // ===== FUNÇÕES DE ÁUDIO =====
     function playSound(soundFile) {
@@ -303,11 +326,16 @@
     }
 
     // ===== COUNTDOWN =====
-    function startCountdown() {
+    function startCountdown(initialCountdown = null) {
         if (countdownInterval) clearInterval(countdownInterval);
         
-        countdown = refreshInterval;
+        countdown = typeof initialCountdown === 'number' ? initialCountdown : refreshInterval;
         const countdownEl = document.getElementById('refresh-countdown');
+        if (countdownEl) {
+            const minutes = Math.floor(countdown / 60);
+            const seconds = countdown % 60;
+            countdownEl.textContent = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+        }
         
         countdownInterval = setInterval(() => {
             if (isRefreshing) {
@@ -334,6 +362,7 @@
     }
 
     function rotateTeams() {
+        if (voiceSyncState.state !== 'idle') return;
         if (!teamRotationEnabled || teams.length === 0) return;
         
         currentTeamIndex = (currentTeamIndex + 1) % (teams.length + 1);
@@ -353,6 +382,97 @@
             }
         });
     }
+
+    const pauseAutoFlowForVoice = () => {
+        voiceSyncState.previousAuto = {
+            isRefreshing,
+            countdown,
+            currentTeamId: getCurrentTeamId(),
+        };
+        setVoiceState('voice_mode');
+        window.speechSynthesis.cancel();
+        isRefreshing = false;
+        if (countdownInterval) clearInterval(countdownInterval);
+        if (teamRotationInterval) clearInterval(teamRotationInterval);
+        updateVoiceButtonState(true);
+    };
+
+    const restoreAutoFlowAfterVoice = async () => {
+        const previous = voiceSyncState.previousAuto;
+        setVoiceState('idle');
+        if (previous) {
+            const previousTeamId = previous.currentTeamId || 'all';
+            selectTeam(previousTeamId);
+            await refreshDashboard(previousTeamId);
+            isRefreshing = previous.isRefreshing;
+            if (isRefreshing) {
+                startCountdown(previous.countdown);
+            } else {
+                const countdownEl = document.getElementById('refresh-countdown');
+                if (countdownEl) {
+                    const minutes = Math.floor(previous.countdown / 60);
+                    const seconds = previous.countdown % 60;
+                    countdownEl.textContent = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+                }
+            }
+        }
+        if (teamRotationEnabled) {
+            teamRotationInterval = setInterval(rotateTeams, {{ $dashboardConfig['team_rotation_interval'] ?? 30 }} * 1000);
+        }
+        updateVoiceButtonState(false);
+    };
+
+    const ensureVoicesLoaded = () => {
+        return new Promise((resolve) => {
+            if (window.speechSynthesis.getVoices().length > 0) {
+                resolve();
+                return;
+            }
+            window.speechSynthesis.addEventListener('voiceschanged', () => resolve(), { once: true });
+        });
+    };
+
+    // Configurações de voz do sistema (disponíveis no PHP)
+    const browserVoiceName = @json(App\Models\Config::where('key', 'notifications_voice_browser_name')->value('value') ?? '');
+    const systemVoiceEnabled = @json((App\Models\Config::where('key', 'notifications_voice_enabled')->value('value') ?? 'false') === 'true');
+    const voiceScope = @json($configs['notifications_voice_scope'] ?? 'global');
+    const voiceMode = @json(App\Models\Config::where('key', 'notifications_voice_mode')->value('value') ?? 'server');
+
+    const getBrowserVoice = () => {
+        if (!browserVoiceName) return null;
+        const voices = window.speechSynthesis.getVoices();
+        return voices.find(v => v.name === browserVoiceName) || null;
+    };
+
+    const speakText = (text) => {
+        return new Promise((resolve) => {
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voice = getBrowserVoice();
+            if (voice) {
+                utterance.voice = voice;
+            }
+            utterance.onend = () => resolve();
+            utterance.onerror = () => resolve();
+            updateVoiceButtonState(true);
+            window.speechSynthesis.speak(utterance);
+        });
+    };
+
+    const fetchVoiceContent = async ({ scope, teamId = null }) => {
+        const url = new URL(`/monitor/${monitorSlug}/voice`, window.location.origin);
+        url.searchParams.set('scope', scope);
+        if (teamId) {
+            url.searchParams.set('team_id', teamId);
+        }
+        const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.warn('Monitor: Voz indisponível', { scope, teamId, error: errorData });
+            return null;
+        }
+        const result = await response.json();
+        return result?.content || null;
+    };
 
     // ===== EVENT LISTENERS =====
     document.addEventListener('DOMContentLoaded', function() {
@@ -379,16 +499,239 @@
 
         // Leitura por voz
         const voiceBtn = document.getElementById('read-voice-btn');
+        const startVoiceSyncFlow = async () => {
+                    pauseAutoFlowForVoice();
+                    try {
+                        await ensureVoicesLoaded();
+
+                        setVoiceState('reading_general');
+                        selectTeam('all');
+                        await refreshDashboard('all');
+
+                        const generalText = await fetchVoiceContent({ scope: 'global' });
+                        if (!generalText) {
+                            showCustomAlert(
+                                'Sem ranking',
+                                'Não foi possível gerar a leitura do ranking geral no momento.',
+                                'warning'
+                            );
+                            return;
+                        }
+                        await speakText(generalText);
+
+                        const shouldIncludeTeams = ['teams', 'both'].includes(voiceScope);
+                        if (!shouldIncludeTeams) {
+                            return;
+                        }
+
+                        for (const team of teams) {
+                            setVoiceState('reading_team');
+                            selectTeam(team.id);
+                            await refreshDashboard(team.id);
+
+                            const teamText = await fetchVoiceContent({ scope: 'team', teamId: team.id });
+                            if (teamText) {
+                                await speakText(teamText);
+                            }
+                        }
+                    } finally {
+                        await restoreAutoFlowAfterVoice();
+                    }
+                };
+
+        const startVoiceSequence = async ({ silent = false } = {}) => {
+            if (window.isSpeaking || voiceSyncState.state !== 'idle') {
+                return;
+            }
+
+            const rawVoiceEnabled = config.voice_enabled;
+            const monitorVoiceEnabled = rawVoiceEnabled === true ||
+                rawVoiceEnabled === 'true' ||
+                rawVoiceEnabled === 1 ||
+                rawVoiceEnabled === '1';
+
+            if (!monitorVoiceEnabled) {
+                if (!silent) {
+                    showCustomAlert(
+                        'Voz não habilitada no Monitor',
+                        'A leitura por voz não está habilitada para este monitor. Para habilitar, edite o monitor e marque a opção "Leitura por voz habilitada".',
+                        'warning'
+                    );
+                }
+                return;
+            }
+
+            if (!systemVoiceEnabled) {
+                if (!silent) {
+                    showCustomAlert(
+                        'Voz não habilitada no Sistema',
+                        'A leitura por voz não está habilitada nas configurações gerais do sistema. Para habilitar, vá em Configurações > Notificações > Leitura por Voz e marque "Ativar leitura por voz".',
+                        'warning'
+                    );
+                }
+                return;
+            }
+
+            if (!['browser', 'both'].includes(voiceMode)) {
+                if (!silent) {
+                    showCustomAlert(
+                        'Modo de Voz Incompatível',
+                        'O modo de voz do sistema está configurado como "Servidor" apenas, o que não permite leitura no navegador. Para usar a leitura no monitor, configure o modo de voz como "Navegador" ou "Servidor + Navegador" nas configurações gerais.',
+                        'warning'
+                    );
+                }
+                return;
+            }
+
+            if (!('speechSynthesis' in window)) {
+                if (!silent) {
+                    alert('Seu navegador não suporta leitura por voz (SpeechSynthesis).');
+                }
+                return;
+            }
+
+            try {
+                await startVoiceSyncFlow();
+            } catch (error) {
+                console.error('Monitor: Erro ao executar leitura por voz sincronizada:', error);
+                if (!silent) {
+                    showCustomAlert(
+                        'Erro ao executar leitura',
+                        'Ocorreu um erro ao tentar sincronizar a leitura. Verifique o console para mais detalhes.',
+                        'error'
+                    );
+                }
+                await restoreAutoFlowAfterVoice();
+            }
+        };
+
         if (voiceBtn) {
-            voiceBtn.addEventListener('click', function() {
-                showCustomAlert('Leitura por Voz', 'Recurso em desenvolvimento', 'info');
+            voiceButtonEl = voiceBtn;
+
+            voiceBtn.addEventListener('click', async () => {
+                await startVoiceSequence({ silent: false });
             });
         }
+
+        // Leitura por voz automática (scheduler) + log de countdown
+        const voiceAutoState = {
+            lastTriggeredNextRunAt: null,
+            hasInitialized: false,
+            statusTimer: null,
+            pollingTimer: null,
+        };
+
+        const getMonitorVoiceEnabled = () => {
+            const rawVoiceEnabled = (window.DASHBOARD_CONFIG || {}).voice_enabled;
+            return rawVoiceEnabled === true ||
+                rawVoiceEnabled === 'true' ||
+                rawVoiceEnabled === 1 ||
+                rawVoiceEnabled === '1';
+        };
+
+        const canUseBrowserVoice = () => {
+            return getMonitorVoiceEnabled() &&
+                systemVoiceEnabled &&
+                ['browser', 'both'].includes(voiceMode) &&
+                ('speechSynthesis' in window);
+        };
+
+        const fetchVoiceStatus = async () => {
+            try {
+                const response = await fetch(`/monitor/${monitorSlug}/voice/status`, {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!response.ok) return null;
+                return await response.json();
+            } catch (error) {
+                console.warn('Monitor: Erro ao obter status da voz:', error);
+                return null;
+            }
+        };
+
+        const logVoiceCountdown = (status) => {
+            if (!status) return;
+            if (!status.enabled) {
+                console.log('Leitura por voz: desativada nas configurações.');
+                return;
+            }
+            const nextRunLabel = status.next_run_at
+                ? new Date(status.next_run_at).toLocaleString('pt-BR')
+                : 'indefinido';
+            if (!status.has_last_run) {
+                console.log(`Leitura por voz: aguardando primeira execução (próxima em ${nextRunLabel}).`);
+                return;
+            }
+            if ((status.overdue_seconds || 0) > 0) {
+                const overdueMinutes = Math.ceil(status.overdue_seconds / 60);
+                console.log(`Leitura por voz: atrasada ${overdueMinutes} min (próxima em ${nextRunLabel}).`);
+                return;
+            }
+            const remainingMinutes = Math.ceil((status.remaining_seconds || 0) / 60);
+            console.log(`Leitura por voz: faltam ${remainingMinutes} min (próxima em ${nextRunLabel}).`);
+        };
+
+        const checkVoicePendingAndStart = async () => {
+            if (!canUseBrowserVoice()) {
+                return;
+            }
+            if (document.visibilityState !== 'visible') {
+                return;
+            }
+            if (voiceSyncState.state !== 'idle' || window.isSpeaking) {
+                return;
+            }
+            const status = await fetchVoiceStatus();
+            if (!status || !status.enabled) {
+                return;
+            }
+            if (!voiceAutoState.hasInitialized) {
+                voiceAutoState.hasInitialized = true;
+                return;
+            }
+            if (!status.has_last_run) {
+                return;
+            }
+            const isDue = (status.remaining_seconds || 0) <= 0 || (status.overdue_seconds || 0) > 0;
+            if (!isDue) {
+                return;
+            }
+            if (voiceAutoState.lastTriggeredNextRunAt === status.next_run_at) {
+                return;
+            }
+            voiceAutoState.lastTriggeredNextRunAt = status.next_run_at || null;
+            await startVoiceSequence({ silent: true });
+        };
+
+        const startVoiceStatusLogging = () => {
+            const tick = async () => {
+                const status = await fetchVoiceStatus();
+                logVoiceCountdown(status);
+            };
+            tick();
+            if (voiceAutoState.statusTimer) clearInterval(voiceAutoState.statusTimer);
+            voiceAutoState.statusTimer = setInterval(tick, 60000);
+        };
+
+        const startVoiceAutoPolling = () => {
+            const tick = async () => {
+                await checkVoicePendingAndStart();
+            };
+            tick();
+            if (voiceAutoState.pollingTimer) clearInterval(voiceAutoState.pollingTimer);
+            voiceAutoState.pollingTimer = setInterval(tick, 60000);
+        };
+
+        startVoiceStatusLogging();
+        startVoiceAutoPolling();
 
         // Seleção de equipes
         const teamChips = document.querySelectorAll('#team-chips button');
         teamChips.forEach(chip => {
             chip.addEventListener('click', function() {
+                if (voiceSyncState.state !== 'idle') {
+                    return;
+                }
                 const teamId = this.dataset.teamId;
                 selectTeam(teamId);
                 refreshDashboard(teamId);
@@ -414,7 +757,7 @@
 
         // Rotação de equipes (se habilitado)
         if (teamRotationEnabled) {
-            setInterval(rotateTeams, {{ $dashboardConfig['team_rotation_interval'] ?? 30 }} * 1000);
+            teamRotationInterval = setInterval(rotateTeams, {{ $dashboardConfig['team_rotation_interval'] ?? 30 }} * 1000);
         }
     });
 </script>

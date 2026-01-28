@@ -8,7 +8,10 @@
                 @php
                     $position = $index + 1;
                     $positionColor = $position <= 3 ? 'from-blue-600 to-blue-500' : ($position <= 6 ? 'from-purple-600 to-purple-500' : 'from-slate-600 to-slate-500');
-                    $initial = strtoupper(substr($entry['name'], 0, 1));
+                    $photoPath = $entry['profile_photo_path'] ?? null;
+                    $avatarSrc = !empty($photoPath)
+                        ? asset('storage/' . $photoPath)
+                        : \App\Support\AvatarHelper::dataUri($entry['name'], 96);
                 @endphp
                 <div class="relative bg-slate-900/60 backdrop-blur-sm rounded-xl p-3 border border-slate-700/50 hover:border-blue-500/50 transition-all group">
                     <div class="flex items-center gap-3">
@@ -17,9 +20,9 @@
                         </div>
                         <div class="relative">
                             <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-600 group-hover:border-blue-500 transition-colors">
-                                <div class="w-full h-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-                                    <span class="text-base font-bold text-white">{{ $initial }}</span>
-                                </div>
+                                <img src="{{ $avatarSrc }}"
+                                     alt="{{ $entry['name'] }}"
+                                     class="w-full h-full object-cover">
                             </div>
                             <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-slate-900"></div>
                         </div>

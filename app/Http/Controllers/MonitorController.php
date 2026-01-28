@@ -11,6 +11,7 @@ use App\Models\Team;
 use App\Services\GamificationService;
 use App\Services\SectorService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class MonitorController extends Controller
 {
@@ -130,9 +131,10 @@ class MonitorController extends Controller
 
         $precision = (int)(\App\Models\Config::where('key', 'points_precision')->value('value') ?? 2);
         $requestedScope = $request->query('scope');
-        $voiceScope = in_array($requestedScope, ['global', 'teams', 'both'], true)
+        $voiceScope = in_array($requestedScope, ['global', 'teams', 'both', 'team'], true)
             ? $requestedScope
             : (\App\Models\Config::where('key', 'notifications_voice_scope')->value('value') ?? 'global');
+        $requestedTeamId = $request->query('team_id') ?? $request->query('team');
         
         $allTexts = [];
 
@@ -157,18 +159,26 @@ class MonitorController extends Controller
         }
 
         // Ler ranking de cada equipe se configurado
-        if (in_array($voiceScope, ['teams', 'both'], true)) {
+        if (in_array($voiceScope, ['teams', 'both', 'team'], true)) {
             // Obter equipes permitidas no monitor ou todas
             $allowedTeamIds = null;
             if (!empty($settings['teams'])) {
                 $allowedTeamIds = $settings['teams'];
             }
-            
             $teamsQuery = \App\Models\Team::where('sector_id', $sectorId)->orderBy('name');
             if ($allowedTeamIds !== null) {
                 $teamsQuery->whereIn('id', $allowedTeamIds);
             }
+            if ($voiceScope === 'team') {
+                if (!$requestedTeamId) {
+                    return response()->json(['error' => 'Equipe não informada'], 422);
+                }
+                $teamsQuery->where('id', $requestedTeamId);
+            }
             $teams = $teamsQuery->get(['id', 'name']);
+            if ($voiceScope === 'team' && $teams->isEmpty()) {
+                return response()->json(['error' => 'Equipe não encontrada'], 404);
+            }
 
             foreach ($teams as $team) {
                 $teamTop = \App\Models\Seller::query()
@@ -203,6 +213,42 @@ class MonitorController extends Controller
         return response()->json([
             'content' => $content,
             'scope' => $voiceScope,
+        ]);
+    }
+
+    /**
+     * Retorna status da leitura por voz (scheduler)
+     */
+    public function voiceStatus(string $slug)
+    {
+        $monitor = Monitor::where('slug', $slug)->firstOrFail();
+
+        if (!$monitor->is_active) {
+            abort(404, 'Monitor inativo');
+        }
+
+        $sectorId = $monitor->sector_id ?? app(SectorService::class)->getDefaultSectorId();
+        $enabled = (Config::where('key', 'notifications_voice_enabled')->value('value') ?? 'false') === 'true';
+        $mode = Config::where('key', 'notifications_voice_mode')->value('value') ?? 'server';
+        $intervalMinutes = (int) (Config::where('key', 'notifications_voice_interval_minutes')->value('value') ?? 15);
+
+        $lastRunKey = "notifications_voice_last_run_at_{$sectorId}";
+        $lastRunValue = Config::where('key', $lastRunKey)->value('value');
+        $now = Carbon::now();
+        $lastRunAt = $lastRunValue ? Carbon::parse($lastRunValue) : null;
+        $nextRunAt = $lastRunAt ? $lastRunAt->copy()->addMinutes($intervalMinutes) : $now->copy();
+        $remainingSeconds = max(0, $now->diffInSeconds($nextRunAt, false));
+        $overdueSeconds = max(0, $nextRunAt->diffInSeconds($now, false));
+
+        return response()->json([
+            'enabled' => $enabled,
+            'mode' => $mode,
+            'interval_minutes' => $intervalMinutes,
+            'has_last_run' => (bool) $lastRunAt,
+            'last_run_at' => $lastRunAt?->toIso8601String(),
+            'next_run_at' => $nextRunAt->toIso8601String(),
+            'remaining_seconds' => $remainingSeconds,
+            'overdue_seconds' => $overdueSeconds,
         ]);
     }
 
@@ -311,6 +357,7 @@ class MonitorController extends Controller
                 'id' => $seller->id,
                 'name' => $seller->name,
                 'email' => $seller->email,
+                'profile_photo_path' => $seller->profile_photo_path,
                 'points' => $seller->points,
                 'level' => $gamification['level'],
                 'badge' => $gamification['badge'],
