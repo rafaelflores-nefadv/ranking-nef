@@ -58,12 +58,14 @@
                     $isAdmin = $user && $user->role === 'admin';
                     $initialSectorId = old('sector_id') ?? ($isAdmin ? ($seller->sector_id ?? '') : ($user->sector_id ?? ''));
                     $teamsData = $teams->map(function($team) {
+                        $displayLabel = $team->display_label;
                         return [
                             'id' => $team->id,
                             'name' => $team->name,
+                            'display_label' => $displayLabel,
                             'sector_id' => $team->sector_id,
                             'sellers_count' => $team->sellers_count ?? 0,
-                            'searchText' => strtolower($team->name ?? '')
+                            'searchText' => strtolower(($displayLabel ?: '') . ' ' . ($team->name ?? ''))
                         ];
                     })->toArray();
                     $selectedTeamIds = old('teams', $currentTeamIds ?? []);
@@ -165,7 +167,7 @@
                                         class="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2">
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center gap-2">
-                                            <span class="text-white text-sm font-medium" x-text="team.name || ''"></span>
+                                            <span class="text-white text-sm font-medium" x-text="team.display_label || team.name || ''"></span>
                                             <span x-show="isSelected(team.id)" class="text-xs px-2 py-0.5 rounded-full bg-blue-600/20 text-blue-400 border border-blue-600/30">
                                                 Selecionada
                                             </span>
@@ -182,7 +184,7 @@
                                 @foreach($teams as $team)
                                     <label class="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700/50 cursor-pointer transition-colors border border-transparent hover:border-slate-600 team-item"
                                            data-team-id="{{ $team->id }}"
-                                           data-team-name="{{ strtolower($team->name ?? '') }}"
+                                           data-team-name="{{ strtolower(($team->display_label ?? '') . ' ' . ($team->name ?? '')) }}"
                                            data-sector-id="{{ $team->sector_id }}"
                                            @if(in_array($team->id, old('teams', $currentTeamIds ?? []))) style="background-color: rgba(51, 65, 85, 0.3); border-color: rgba(59, 130, 246, 0.3);" @endif>
                                         <input 
@@ -193,7 +195,7 @@
                                             class="team-checkbox w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2">
                                         <div class="flex-1 min-w-0">
                                             <div class="flex items-center gap-2">
-                                                <span class="text-white text-sm font-medium">{{ $team->name }}</span>
+                                                <span class="text-white text-sm font-medium">{{ $team->display_label }}</span>
                                                 @if(in_array($team->id, old('teams', $currentTeamIds ?? [])))
                                                     <span class="text-xs px-2 py-0.5 rounded-full bg-blue-600/20 text-blue-400 border border-blue-600/30">
                                                         Selecionada

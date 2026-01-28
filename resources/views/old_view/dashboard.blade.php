@@ -95,7 +95,7 @@
                         </svg>
                     </div>
                     <div>
-                        <h2 class="text-white font-bold">Ranking de {{ $saleTermLower }}<span id="ranking-team-name">{{ $activeTeam ? ' - ' . $activeTeam->name : '' }}</span></h2>
+                        <h2 class="text-white font-bold">Ranking de {{ $saleTermLower }}<span id="ranking-team-name">{{ $activeTeam ? ' - ' . $activeTeam->display_label : '' }}</span></h2>
                         <p class="text-slate-400 text-xs">Por pontuação</p>
                     </div>
                 </div>
@@ -106,7 +106,7 @@
                     </a>
                     @foreach($teams as $team)
                         <a data-team-id="{{ $team->id }}" href="{{ route('dashboard', ['team' => $team->id]) }}" class="px-2 py-1 rounded-full text-xs border {{ $activeTeam && $activeTeam->id === $team->id ? 'border-blue-500 text-blue-300' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500' }}">
-                            {{ $team->name }}
+                            {{ $team->display_label }}
                         </a>
                     @endforeach
                 </div>
@@ -478,7 +478,10 @@
     }
     const notificationsContainer = document.getElementById('sale-notifications');
     const SALES_STORAGE_KEY = 'ranking_sales_last_timestamp';
-    const SALES_POLLING_INTERVAL = 4000;
+    const NOTIFICATIONS_STORAGE_KEY = 'ranking_notifications_last_timestamp';
+    const SALES_POLLING_MIN_INTERVAL = 4000;
+    const SALES_POLLING_MAX_INTERVAL = 60000;
+    const SALES_POLLING_BACKOFF_FACTOR = 1.5;
 
     // Configurações de sons
     const soundsConfig = @json(json_decode($configs['notifications_sounds_config'] ?? '{}', true) ?: []);
@@ -492,9 +495,12 @@
     @endforeach
     const notificationEventsConfig = @json($notificationEventsConfig ?? []);
 
-    let lastSaleTimestamp =
-        localStorage.getItem(SALES_STORAGE_KEY) ||
-        new Date(Date.now() - 5000).toISOString();
+    const sinceSales = localStorage.getItem(SALES_STORAGE_KEY);
+    let sinceNotifications = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+    let salesPollingTimer = null;
+    let salesPollingDelay = SALES_POLLING_MIN_INTERVAL;
+    let salesPollingInFlight = false;
+    let lastSalesCountLog = null;
 
     const formatPoints = (points) => {
         const value = Number(points || 0);
@@ -651,12 +657,51 @@
         showNextToast();
     };
 
+    const getNewestTimestamp = (sales) => {
+        return sales.reduce((latest, sale) => {
+            const ts = sale?.created_at;
+            if (!ts) return latest;
+            if (!latest || ts > latest) return ts;
+            return latest;
+        }, null);
+    };
+
+    const scheduleNextSalesPoll = (delayMs) => {
+        if (salesPollingTimer) {
+            clearTimeout(salesPollingTimer);
+        }
+        if (!notificationsEnabled || document.visibilityState !== 'visible') {
+            return;
+        }
+        salesPollingTimer = setTimeout(() => {
+            fetchRecentSales();
+        }, delayMs);
+    };
+
+    const updateSalesPollingDelay = (hasData) => {
+        if (hasData) {
+            salesPollingDelay = SALES_POLLING_MIN_INTERVAL;
+            return;
+        }
+        salesPollingDelay = Math.min(
+            SALES_POLLING_MAX_INTERVAL,
+            Math.round(salesPollingDelay * SALES_POLLING_BACKOFF_FACTOR)
+        );
+    };
+
     const fetchRecentSales = async () => {
         if (!notificationsEnabled) return;
+        if (document.visibilityState !== 'visible') {
+            return;
+        }
+        if (salesPollingInFlight) {
+            return;
+        }
+        salesPollingInFlight = true;
 
         const params = new URLSearchParams();
-        if (lastSaleTimestamp) {
-            params.append('since', lastSaleTimestamp);
+        if (sinceNotifications) {
+            params.append('since', sinceNotifications);
         }
         params.append('limit', '20');
 
@@ -674,14 +719,29 @@
 
             if (sales.length > 0) {
                 sales.forEach(createSaleToast);
-                const newestTimestamp = sales[sales.length - 1]?.created_at;
-                if (newestTimestamp) {
-                    lastSaleTimestamp = newestTimestamp;
-                    localStorage.setItem(SALES_STORAGE_KEY, lastSaleTimestamp);
+                const newestTimestamp = getNewestTimestamp(sales);
+                if (newestTimestamp && newestTimestamp !== sinceNotifications) {
+                    sinceNotifications = newestTimestamp;
+                    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, sinceNotifications);
                 }
+                if (lastSalesCountLog !== sales.length) {
+                    console.log('Monitor: Novas vendas recebidas', { count: sales.length });
+                    lastSalesCountLog = sales.length;
+                }
+                updateSalesPollingDelay(true);
+            } else {
+                if (lastSalesCountLog !== 0) {
+                    console.log('Monitor: Nenhuma nova venda');
+                    lastSalesCountLog = 0;
+                }
+                updateSalesPollingDelay(false);
             }
         } catch (error) {
             console.error('Erro ao buscar vendas recentes:', error);
+            updateSalesPollingDelay(false);
+        } finally {
+            salesPollingInFlight = false;
+            scheduleNextSalesPoll(salesPollingDelay);
         }
     };
 
@@ -737,9 +797,29 @@
         updateSoundButton();
     }
 
+    const startSalesPolling = () => {
+        scheduleNextSalesPoll(0);
+    };
+
+    const stopSalesPolling = () => {
+        if (salesPollingTimer) {
+            clearTimeout(salesPollingTimer);
+            salesPollingTimer = null;
+        }
+    };
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            console.log('Monitor: Página visível, retomando polling de notificações');
+            startSalesPolling();
+        } else {
+            console.log('Monitor: Página perdeu o foco, pausando polling de notificações');
+            stopSalesPolling();
+        }
+    });
+
     if (notificationsEnabled) {
-        fetchRecentSales();
-        setInterval(fetchRecentSales, SALES_POLLING_INTERVAL);
+        startSalesPolling();
     }
 </script>
 @endpush

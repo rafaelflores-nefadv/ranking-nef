@@ -120,7 +120,10 @@ class TeamController extends Controller
         $validated = $request->validated();
         
         // Atualizar nome da equipe
-        $team->update(['name' => $validated['name']]);
+        $team->update([
+            'name' => $validated['name'],
+            'display_name' => $validated['display_name'] ?? null,
+        ]);
 
         // Atualizar vendedores da equipe
         if (isset($validated['sellers'])) {

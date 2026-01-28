@@ -35,6 +35,11 @@ class StoreTeamRequest extends FormRequest
                 'max:255',
                 Rule::unique('teams', 'name')->where('sector_id', $sectorId),
             ],
+            'display_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'sector_id' => $user && $user->role === 'admin'
                 ? 'required|uuid|exists:sectors,id'
                 : 'prohibited',
@@ -52,6 +57,7 @@ class StoreTeamRequest extends FormRequest
             'name.required' => 'O nome da equipe é obrigatório.',
             'name.max' => 'O nome da equipe não pode ter mais de 255 caracteres.',
             'name.unique' => 'Já existe uma equipe com este nome.',
+            'display_name.max' => 'O nome de exibição não pode ter mais de 255 caracteres.',
             'sector_id.required' => 'Selecione um setor.',
             'sector_id.exists' => 'O setor selecionado é inválido.',
         ];

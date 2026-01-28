@@ -1,5 +1,13 @@
 # Exemplo Rápido de Teste da API
 
+> Importante: não utilize tokens reais em exemplos versionados. Use placeholders.
+
+## Pré-requisitos
+
+- Token de API ativo (gerado no painel em **Configurações > Integrações API**)
+- Vendedor existente no setor do token (por email ou external_code, conforme o token)
+- Regra de pontuação ativa no setor para o valor enviado em `ocorrencia`
+
 ## Teste Rápido com cURL
 
 ### 1. Teste Básico - Ocorrência Simples
@@ -7,9 +15,9 @@
 ```bash
 curl -X POST http://localhost:8000/api/webhook/occurrences \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1" \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI" \
   -d '{
-    "email_funcionario": "teste@extranef.com.br",
+    "email_funcionario": "IDENTIFICADOR_DO_VENDEDOR",
     "ocorrencia": "30.1 - C/ PROPOSTA"
   }'
 ```
@@ -22,9 +30,9 @@ curl -X POST http://localhost:8000/api/webhook/occurrences \
 ```bash
 curl -X POST http://localhost:8000/api/webhook/occurrences \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1" \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI" \
   -d '{
-    "email_funcionario": "teste@extranef.com.br",
+    "email_funcionario": "IDENTIFICADOR_DO_VENDEDOR",
     "ocorrencia": "30.8 -  BOLETO PAGO",
     "credor": "Cliente Teste LTDA"
   }'
@@ -38,17 +46,19 @@ curl -X POST http://localhost:8000/api/webhook/occurrences \
 ```bash
 curl -X POST http://localhost:8000/api/webhook/occurrences \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1" \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI" \
   -d '{
-    "email_funcionario": "teste@extranef.com.br",
+    "email_funcionario": "IDENTIFICADOR_DO_VENDEDOR",
     "ocorrencia": "30.6 - BOLETO ENVIADO",
     "credor": "Cliente Teste LTDA",
-    "equipe": "Equipe Teste"
+    "equipe": "equipe_teste"
   }'
 ```
 
 **Resultado esperado**: 201 Created
 **Pontos esperados**: 3 pontos
+
+> Nota: o campo `equipe` deve receber o **nome técnico** da equipe (`teams.name`). O “Nome de Exibição” (visual) não é usado pela API.
 
 ## Verificar Resultados
 
@@ -65,7 +75,7 @@ php artisan tinker
 ```
 
 ```php
-$seller = \App\Models\Seller::where('email', 'teste@extranef.com.br')->first();
+$seller = \App\Models\Seller::where('email', 'vendedor@empresa.com')->first();
 echo "Nome: " . $seller->name . "\n";
 echo "Email: " . $seller->email . "\n";
 echo "Pontos: " . $seller->points . "\n";
@@ -76,7 +86,7 @@ echo "Status: " . $seller->status . "\n";
 
 - [ ] Token está correto e ativo
 - [ ] URL base está correta (localhost:8000 ou seu domínio)
-- [ ] Email do funcionário está correto: `teste@extranef.com.br`
+- [ ] Identificador do vendedor está correto (email ou external_code, conforme token)
 - [ ] Tipo de ocorrência corresponde a uma regra cadastrada
 - [ ] Fila está rodando OU processar manualmente com `php artisan process:api-occurrences`
 - [ ] Verificar pontos no dashboard ou via tinker

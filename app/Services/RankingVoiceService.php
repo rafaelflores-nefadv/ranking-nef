@@ -38,7 +38,7 @@ class RankingVoiceService
             $sectorKey = $sector->id;
             $lastRunAt = $this->getDateConfig($this->sectorKey('notifications_voice_last_run_at', $sectorKey));
 
-            if ($lastRunAt && now()->diffInMinutes($lastRunAt) < $interval) {
+            if ($lastRunAt && Carbon::now('UTC')->diffInMinutes($lastRunAt) < $interval) {
                 continue;
             }
 
@@ -65,7 +65,9 @@ class RankingVoiceService
 
             if (in_array($scope, ['teams', 'both'], true)) {
                 $lastHashes = $this->getJsonConfig($this->sectorKey('notifications_voice_last_hash_teams', $sectorKey));
-                $teams = Team::where('sector_id', $sectorKey)->orderBy('name')->get(['id', 'name']);
+                $teams = Team::where('sector_id', $sectorKey)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'display_name']);
 
                 foreach ($teams as $team) {
                     $teamTop = $this->getTopSellers($season->id, $team->id, $sectorKey);
@@ -81,7 +83,7 @@ class RankingVoiceService
                     }
 
                     $content = $this->buildRankingText(
-                        "Top 3 da equipe {$team->name}:",
+                        "Top 3 da equipe {$team->display_label}:",
                         $teamTop->all(),
                         $precision
                     );
@@ -94,7 +96,10 @@ class RankingVoiceService
             }
 
             if ($dispatched) {
-                $this->setConfig($this->sectorKey('notifications_voice_last_run_at', $sectorKey), now()->toIso8601String());
+                $this->setConfig(
+                    $this->sectorKey('notifications_voice_last_run_at', $sectorKey),
+                    Carbon::now('UTC')->toIso8601String()
+                );
             }
         }
     }
@@ -183,7 +188,7 @@ class RankingVoiceService
         }
 
         try {
-            return Carbon::parse($value);
+            return Carbon::parse($value, 'UTC')->utc();
         } catch (\Throwable) {
             return null;
         }

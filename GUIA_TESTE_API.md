@@ -1,26 +1,37 @@
 # Guia de Teste da API - Ranking NEF
 
-Este guia explica como testar a API com o usuário fornecido e o token REVO.
+Este guia explica como testar o endpoint de webhook da API do Ranking NEF.
 
-## Informações do Usuário de Teste
+> Importante: este repositório **não deve** conter tokens reais. Os exemplos abaixo usam placeholders.
 
-- **Nome**: Teste
-- **Email**: teste@extranef.com.br
-- **Pontos**: 0
-- **Equipe**: - (nenhuma)
-- **Temporada**: Temporada Atual
-- **Status**: Ativo
+## Pré-requisitos
 
-## Token REVO
+- Um **token de API ativo** (gerado no painel: **Configurações > Integrações API**)
+- Um **setor** associado ao token (o token sempre opera dentro de um setor)
+- Um **vendedor existente** no mesmo setor do token
+- Uma **regra de pontuação ativa** no setor para o valor enviado em `ocorrencia`
+- (Opcional) Se enviar `equipe`, envie o **nome técnico** da equipe (`teams.name`). A equipe deve existir no setor **e** o vendedor deve pertencer a ela.
 
-- **Token**: `rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1`
-- **Secret**: `wK7e985cqiKDJEww4cnBUXG8gPq8g1TI5YV1almafDMZK30yzog3j5oWjAoRiOjC`
+## Autenticação (Bearer Token)
 
-> **Nota**: O secret não é necessário para fazer requisições à API, apenas o token.
+Envie o token no header `Authorization`:
+
+```http
+Authorization: Bearer SEU_TOKEN_AQUI
+```
+
+## Identificador do vendedor (`email_funcionario`)
+
+Apesar do nome do campo ser `email_funcionario`, o valor aceito depende da configuração do token:
+
+- Se o token estiver configurado para identificar colaboradores por **email**, envie um email válido (ex.: `vendedor@empresa.com`)
+- Se o token estiver configurado para identificar por **código externo**, envie o **external_code** do vendedor (string)
 
 ## Regras de Pontuação Cadastradas
 
-As seguintes regras de pontuação estão disponíveis no sistema:
+O valor do campo `ocorrencia` deve corresponder **exatamente** a uma regra ativa (`score_rules`) do setor do token.
+
+Exemplos (dependem do seu cadastro):
 
 | Ocorrência | Pontos |
 |------------|--------|
@@ -52,7 +63,11 @@ O script irá:
 2. Enviar uma ocorrência com credor (30.8 - BOLETO PAGO)
 3. Exibir os resultados e um resumo
 
-**Antes de executar**, ajuste a variável `$baseUrl` no início do arquivo se necessário.
+**Antes de executar**, defina as variáveis de ambiente (ou edite o topo do script, se preferir):
+
+- `RANKING_NEF_BASE_URL` (ex.: `http://localhost:8000`)
+- `RANKING_NEF_API_TOKEN` (token do painel)
+- `RANKING_NEF_TEST_IDENTIFIER` (email ou external_code, conforme o token)
 
 ### Opção 2: Usando o Script PowerShell (Windows)
 
@@ -69,9 +84,9 @@ Funciona da mesma forma que o script PHP, mas otimizado para Windows.
 ```bash
 curl -X POST http://localhost:8000/api/webhook/occurrences \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1" \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI" \
   -d '{
-    "email_funcionario": "teste@extranef.com.br",
+    "email_funcionario": "IDENTIFICADOR_DO_VENDEDOR",
     "ocorrencia": "30.1 - C/ PROPOSTA"
   }'
 ```
@@ -81,9 +96,9 @@ curl -X POST http://localhost:8000/api/webhook/occurrences \
 ```bash
 curl -X POST http://localhost:8000/api/webhook/occurrences \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1" \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI" \
   -d '{
-    "email_funcionario": "teste@extranef.com.br",
+    "email_funcionario": "IDENTIFICADOR_DO_VENDEDOR",
     "ocorrencia": "30.8 -  BOLETO PAGO",
     "credor": "Cliente Teste LTDA"
   }'
@@ -94,12 +109,12 @@ curl -X POST http://localhost:8000/api/webhook/occurrences \
 ```bash
 curl -X POST http://localhost:8000/api/webhook/occurrences \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1" \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI" \
   -d '{
-    "email_funcionario": "teste@extranef.com.br",
+    "email_funcionario": "IDENTIFICADOR_DO_VENDEDOR",
     "ocorrencia": "30.6 - BOLETO ENVIADO",
     "credor": "Cliente Teste LTDA",
-    "equipe": "Equipe Teste"
+    "equipe": "equipe_teste"
   }'
 ```
 
@@ -150,13 +165,12 @@ chmod +x test-api-curl.sh
 
 1. **Recebimento**: A ocorrência é recebida via webhook e armazenada na tabela `api_occurrences`
 2. **Processamento Assíncrono**: Um job em background (`ProcessApiOccurrencesJob`) processa a ocorrência
-3. **Validação**: O sistema verifica se existe um vendedor com o email informado
-4. **Criação Automática**: Se o vendedor não existir, ele será criado automaticamente com:
-   - Nome: o próprio email (pode ser atualizado depois)
-   - Pontos: 0
-   - Status: active
-5. **Regras de Pontuação**: O sistema busca a regra de pontuação correspondente ao tipo de ocorrência
-6. **Atualização**: Se a regra existir e estiver ativa, os pontos são atribuídos ao vendedor
+3. **Validação**: o sistema valida se existe vendedor no setor do token e se existe regra ativa para a ocorrência
+4. **Atualização**: se tudo estiver OK, cria `scores` e incrementa `sellers.points`
+
+Se o vendedor **não existir** no setor do token, a API retorna **422** com:
+
+- `Vendedor não encontrado no setor`
 
 ## Verificando os Resultados
 
@@ -173,13 +187,13 @@ php artisan tinker
 ### 2. Verificar se o Vendedor foi Criado/Atualizado
 
 ```php
-\App\Models\Seller::where('email', 'teste@extranef.com.br')->first();
+\App\Models\Seller::where('email', 'vendedor@empresa.com')->first();
 ```
 
 ### 3. Verificar os Pontos Atribuídos
 
 ```php
-$seller = \App\Models\Seller::where('email', 'teste@extranef.com.br')->first();
+$seller = \App\Models\Seller::where('email', 'vendedor@empresa.com')->first();
 $seller->points; // Pontos totais
 $seller->scores; // Histórico de pontuações
 ```
@@ -234,9 +248,9 @@ php artisan queue:listen --tries=1
    ```bash
    curl -X POST http://localhost:8000/api/webhook/occurrences \
      -H "Content-Type: application/json" \
-     -H "Authorization: Bearer rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1" \
+     -H "Authorization: Bearer SEU_TOKEN_AQUI" \
      -d '{
-       "email_funcionario": "teste@extranef.com.br",
+       "email_funcionario": "IDENTIFICADOR_DO_VENDEDOR",
        "ocorrencia": "30.8 -  BOLETO PAGO",
        "credor": "Cliente ABC LTDA"
      }'
@@ -251,13 +265,14 @@ php artisan queue:listen --tries=1
 
 4. **Verificar pontos no dashboard** ou via tinker:
    ```php
-   $seller = \App\Models\Seller::where('email', 'teste@extranef.com.br')->first();
+   $seller = \App\Models\Seller::where('email', 'vendedor@empresa.com')->first();
    echo "Pontos: " . $seller->points; // Deve ser 4 (BOLETO PAGO)
    ```
 
 ## Notas Importantes
 
 - O campo `ocorrencia` deve corresponder **exatamente** ao valor cadastrado na tabela `score_rules`
-- O sistema cria automaticamente vendedores que não existem, mas é recomendado criar o vendedor antes de enviar ocorrências
+- O sistema **não cria vendedores automaticamente** via webhook — cadastre o vendedor (no setor correto) antes de enviar ocorrências
 - As ocorrências são processadas de forma assíncrona, então pode haver um pequeno delay entre o envio e a atualização dos pontos
-- O campo `equipe` é opcional e não afeta a pontuação, apenas serve para referência
+- O campo `equipe` é opcional e não afeta a pontuação, apenas serve para referência/validação de vínculo
+- Se sua equipe tiver “Nome de Exibição” no painel, isso é apenas visual. Para integrações, use sempre o **nome técnico** (`teams.name`) no campo `equipe`.

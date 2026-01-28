@@ -86,7 +86,7 @@ class EvolutionService
                 'seller_id' => $sellerId,
                 'seller_name' => $seller?->name ?? 'N/A',
                 'seller_email' => $seller?->email ?? 'N/A',
-                'team_name' => $seller?->team?->name ?? 'N/A',
+                'team_name' => $seller?->team?->display_label ?? 'N/A',
                 'evolution' => $dailyData,
             ];
         });

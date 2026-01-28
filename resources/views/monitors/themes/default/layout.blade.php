@@ -139,11 +139,16 @@
     @endphp
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            if (window.MONITOR_VOICE_AUTOMATION_HANDLED) {
+                return;
+            }
+
             // Verificar se voz está habilitada no monitor E no sistema
             const monitorVoiceEnabled = @json($monitorVoiceEnabled);
             const systemVoiceEnabled = @json($systemVoiceEnabled);
             const voiceMode = @json($voiceMode);
             const browserVoiceName = @json($browserVoiceName);
+            const voiceIntervalMinutes = @json((int) (App\Models\Config::where('key', 'notifications_voice_interval_minutes')->value('value') ?? 15));
 
             // Voz só funciona se habilitada no monitor E no sistema E modo browser/both
             if (!monitorVoiceEnabled || !systemVoiceEnabled || !['browser', 'both'].includes(voiceMode)) {
@@ -161,13 +166,9 @@
             }
 
             const monitorSlug = window.DASHBOARD_CONFIG?.monitor_slug || '';
-            const STORAGE_KEY = `monitor_${monitorSlug}_voice_last_seen`;
-            let lastSeen = localStorage.getItem(STORAGE_KEY);
-
-            if (!lastSeen) {
-                lastSeen = new Date().toISOString();
-                localStorage.setItem(STORAGE_KEY, lastSeen);
-            }
+            const voiceScope = @json($configs['notifications_voice_scope'] ?? 'global');
+            const voiceOnlyWhenChanged = @json((($configs['notifications_voice_only_when_changed'] ?? 'false') === 'true'));
+            let lastVoiceHash = null;
 
             let voicesCache = [];
             const updateVoices = () => {
@@ -187,7 +188,6 @@
             const speakNext = () => {
                 if (!queue.length) {
                     speaking = false;
-                    // Reabilitar botão quando terminar todas as leituras automáticas
                     if (typeof window.updateVoiceButtonState === 'function') {
                         window.updateVoiceButtonState(false);
                     }
@@ -195,11 +195,10 @@
                 }
 
                 speaking = true;
-                // Desabilitar botão quando começar leitura automática
                 if (typeof window.updateVoiceButtonState === 'function') {
                     window.updateVoiceButtonState(true);
                 }
-                
+
                 const text = queue.shift();
                 const utterance = new SpeechSynthesisUtterance(text);
                 const voice = resolveVoice();
@@ -222,36 +221,82 @@
                 }
             };
 
-            const fetchVoiceEntries = async () => {
+            const hashText = (text) => {
+                let hash = 0;
+                for (let i = 0; i < text.length; i += 1) {
+                    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+                    hash |= 0;
+                }
+                return String(hash);
+            };
+
+            const fetchVoiceContent = async () => {
+                if (document.visibilityState !== 'visible' || speaking) {
+                    return;
+                }
                 try {
-                    const params = new URLSearchParams({ limit: '10', since: lastSeen });
-                    const response = await fetch(`/notifications/voice/recent?${params.toString()}`, {
+                    const normalizedScope = ['global', 'teams', 'both'].includes(voiceScope) ? voiceScope : 'global';
+                    const url = new URL(`/monitor/${monitorSlug}/voice`, window.location.origin);
+                    url.searchParams.set('scope', normalizedScope);
+                    const response = await fetch(url.toString(), {
                         headers: { 'Accept': 'application/json' },
                     });
 
                     if (!response.ok) return;
 
                     const result = await response.json();
-                    const items = result?.data || [];
+                    const content = result?.content || '';
+                    if (!content) return;
 
-                    if (!items.length) return;
-
-                    const ordered = items.slice().reverse();
-                    ordered.forEach((item) => enqueue(item?.content));
-
-                    const newest = items[0]?.created_at;
-                    if (newest) {
-                        lastSeen = newest;
-                        localStorage.setItem(STORAGE_KEY, lastSeen);
+                    if (voiceOnlyWhenChanged) {
+                        const nextHash = hashText(content);
+                        if (lastVoiceHash && lastVoiceHash === nextHash) {
+                            return;
+                        }
+                        lastVoiceHash = nextHash;
                     }
+
+                    enqueue(content);
                 } catch (error) {
                     console.error('Monitor: Erro ao buscar leitura por voz:', error);
                 }
             };
 
+            const startVoiceTimer = () => {
+                const intervalMs = Math.max(1, Number(voiceIntervalMinutes || 15)) * 60000;
+                let nextExecution = Date.now() + intervalMs;
+                let infoLogTimer = null;
+
+                console.log('Monitor: Leitura por voz carregada', {
+                    intervalo_minutos: Math.max(1, Number(voiceIntervalMinutes || 15)),
+                    proxima_execucao: new Date(nextExecution).toLocaleTimeString('pt-BR')
+                });
+
+                const startInfoLog = () => {
+                    if (infoLogTimer) clearInterval(infoLogTimer);
+                    infoLogTimer = setInterval(() => {
+                        console.log('Monitor: Leitura por voz agendada', {
+                            proxima_execucao: new Date(nextExecution).toLocaleTimeString('pt-BR'),
+                            minutos_restantes: Math.max(0, Math.ceil((nextExecution - Date.now()) / 60000))
+                        });
+                    }, 60000);
+                };
+
+                const scheduleNext = () => {
+                    const delayMs = Math.max(0, nextExecution - Date.now());
+                    setTimeout(async () => {
+                        await fetchVoiceContent();
+                        nextExecution = Date.now() + intervalMs;
+                        scheduleNext();
+                    }, delayMs);
+                };
+
+                startInfoLog();
+                scheduleNext();
+            };
+
             console.log('Monitor: Leitura por voz habilitada');
-            fetchVoiceEntries();
-            setInterval(fetchVoiceEntries, 15000);
+            startVoiceTimer();
         });
     </script>
 </body>

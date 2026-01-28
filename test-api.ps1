@@ -1,6 +1,6 @@
 # Script de Teste da API - Ranking NEF (PowerShell)
 # 
-# Este script testa o envio de ocorrencias via API usando o token REVO fornecido.
+# Este script testa o envio de ocorrencias via API usando um token de integração.
 # 
 # Uso:
 #   .\test-api.ps1
@@ -10,15 +10,23 @@
 # ============================================
 
 # URL base da API (ajuste conforme necessario)
-$baseUrl = "http://localhost:8000"
+$baseUrl = if ($env:RANKING_NEF_BASE_URL) { $env:RANKING_NEF_BASE_URL } else { "http://localhost:8000" }
 
-# Token REVO fornecido
-$token = "rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1"
+# Token da integração (defina em RANKING_NEF_API_TOKEN)
+$token = $env:RANKING_NEF_API_TOKEN
+
+if (-not $token) {
+    Write-Host "ERRO: defina a variável de ambiente RANKING_NEF_API_TOKEN com o token da integração." -ForegroundColor Red
+    exit 1
+}
+
+# Identificador do vendedor (email ou external_code, conforme o token)
+$identifier = if ($env:RANKING_NEF_TEST_IDENTIFIER) { $env:RANKING_NEF_TEST_IDENTIFIER } else { "vendedor@empresa.com" }
 
 # Dados do usuario de teste
 $usuario = @{
     nome = "Teste"
-    email = "teste@extranef.com.br"
+    email = $identifier
     pontos = 0
     equipe = $null
     status = "Ativo"
@@ -173,7 +181,7 @@ if ($usuario.equipe) {
 }
 Write-Host "  Status: $($usuario.status)"
 Write-Host ""
-Write-Host "Token REVO: $($token.Substring(0, 20))..."
+Write-Host "Token: $($token.Substring(0, 20))..."
 Write-Host "URL Base: $baseUrl"
 Write-Host ""
 

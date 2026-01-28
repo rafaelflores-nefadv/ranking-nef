@@ -22,15 +22,17 @@ npm install
 
 ### 2. Configurar Banco de Dados
 
-Edite o arquivo `.env` e configure:
+Crie o arquivo `.env` a partir do `.env.example` e configure o banco.
+
+Edite o arquivo `.env` e ajuste (exemplo **sem credenciais reais**):
 
 ```env
 DB_CONNECTION=mysql
-DB_HOST=192.168.200.8
+DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=ranking_vendas_nef
-DB_USERNAME=nef_user
-DB_PASSWORD="Nefbi2025@"
+DB_DATABASE=ranking_nef
+DB_USERNAME=seu_usuario
+DB_PASSWORD="sua_senha"
 ```
 
 ### 3. Executar Migrations e Seeders
@@ -60,7 +62,7 @@ composer run dev
 Este comando inicia automaticamente:
 - ✅ Servidor Laravel (http://localhost:8000)
 - ✅ Queue Worker (processa jobs)
-- ✅ Vite Dev Server (hot reload do React)
+- ✅ Vite Dev Server (assets: JS/CSS)
 - ✅ Logs em tempo real
 
 #### Opção B: Separado (para debug)
@@ -70,7 +72,7 @@ Este comando inicia automaticamente:
 php artisan serve
 ```
 
-**Terminal 2 - Vite (React):**
+**Terminal 2 - Vite (assets):**
 ```bash
 npm run dev
 ```
@@ -126,7 +128,7 @@ php artisan route:list
 ### Erro: "Port 8000 already in use"
 - Use outra porta: `php artisan serve --port=8001`
 
-### React não carrega
+### Assets (JS/CSS) não atualizam
 - Certifique-se de que `npm run dev` está rodando
 - Verifique o console do navegador para erros
 
@@ -135,6 +137,7 @@ php artisan route:list
 1. ✅ Fazer login com um dos usuários de teste
 2. ✅ Verificar o ranking de vendedores
 3. ✅ Testar CRUD de sellers, teams, seasons
+   - Em **Equipes**, use **Nome da Equipe** como identificador técnico (integrações/API) e, se quiser, preencha **Nome de Exibição** para apresentação visual
 4. ✅ Enviar ocorrência via webhook: `POST /api/webhook/occurrences`
 
 ## 🎯 Estrutura do Projeto
@@ -151,12 +154,11 @@ ranking-nef/
 │   ├── migrations/               # Migrations
 │   └── seeders/                  # Seeders
 ├── resources/
-│   ├── js/                       # Frontend React
-│   │   ├── core/                 # Core (api, store, services)
-│   │   ├── pages/                # Páginas React
-│   │   └── components/           # Componentes React
+│   ├── js/                       # Frontend JS (Alpine.js + axios)
 │   └── views/                    # Views Blade
 └── routes/
     ├── api.php                   # Rotas API
-    └── web.php                   # Rotas Web (SPA)
+    └── web.php                   # Rotas Web (Blade)
 ```
+
+> Nota: O frontend é renderizado em Blade e usa JS leve (Alpine.js/axios) — não é um projeto React.

@@ -43,7 +43,19 @@
                     <label for="name" class="block text-sm font-medium text-slate-300 mb-2">Nome da Equipe</label>
                     <input type="text" id="name" name="name" value="{{ old('name') }}" required
                         class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <p class="mt-1 text-xs text-slate-400">Identificador técnico usado nas integrações.</p>
                     @error('name')
+                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <!-- Nome de Exibição -->
+                <div class="mb-6">
+                    <label for="display_name" class="block text-sm font-medium text-slate-300 mb-2">Nome de Exibição</label>
+                    <input type="text" id="display_name" name="display_name" value="{{ old('display_name') }}"
+                        class="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <p class="mt-1 text-xs text-slate-400">Opcional. Usado para exibir na interface e no monitor.</p>
+                    @error('display_name')
                         <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
                     @enderror
                 </div>

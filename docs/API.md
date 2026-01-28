@@ -88,7 +88,7 @@ Authorization: Bearer rknf_seu_token_aqui
 | `email_funcionario` | string (email) | Sim | Email do funcionário/vendedor que realizou a venda ou evento |
 | `ocorrencia` | string | Sim | Tipo de ocorrência (ex: "Venda", "Contato", "Proposta", etc.) |
 | `credor` | string | Não | Nome do credor (opcional) |
-| `equipe` | string | Não | Nome da equipe (opcional) |
+| `equipe` | string | Não | **Nome técnico** da equipe (campo `teams.name`). Opcional. **A API não usa o “Nome de Exibição”** (visual). |
 
 #### Exemplo de Requisição
 
@@ -97,7 +97,7 @@ Authorization: Bearer rknf_seu_token_aqui
   "email_funcionario": "vendedor@empresa.com",
   "ocorrencia": "Venda",
   "credor": "Cliente ABC Ltda",
-  "equipe": "Equipe Norte"
+  "equipe": "equipe_norte"
 }
 ```
 
@@ -114,8 +114,19 @@ Authorization: Bearer rknf_seu_token_aqui
 
 ```json
 {
-  "message": "Token inválido ou inativo",
+  "message": "Token inválido",
   "error": "Unauthorized"
+}
+```
+
+#### Resposta de Erro (403 Forbidden)
+
+Quando o token existe, mas está inativo (ou a integração associada está inativa):
+
+```json
+{
+  "message": "Token inativo",
+  "error": "Forbidden"
 }
 ```
 
@@ -149,7 +160,7 @@ curl -X POST https://seu-dominio.com/api/webhook/occurrences \
     "email_funcionario": "joao.silva@empresa.com",
     "ocorrencia": "Venda",
     "credor": "Empresa XYZ Ltda",
-    "equipe": "Equipe Sul"
+    "equipe": "equipe_sul"
   }'
 ```
 
@@ -184,7 +195,7 @@ enviarOcorrencia({
   email: 'joao.silva@empresa.com',
   tipo: 'Venda',
   credor: 'Empresa XYZ Ltda',
-  equipe: 'Equipe Sul'
+  equipe: 'equipe_sul'
 })
   .then(result => console.log('Sucesso:', result))
   .catch(error => console.error('Erro:', error));
@@ -225,7 +236,7 @@ try {
         'email_funcionario' => 'joao.silva@empresa.com',
         'ocorrencia' => 'Venda',
         'credor' => 'Empresa XYZ Ltda',
-        'equipe' => 'Equipe Sul'
+        'equipe' => 'equipe_sul'
     ]);
     echo "Ocorrência enviada com sucesso! ID: " . $resultado['id'];
 } catch (Exception $e) {
@@ -261,7 +272,7 @@ try:
         'email_funcionario': 'joao.silva@empresa.com',
         'ocorrencia': 'Venda',
         'credor': 'Empresa XYZ Ltda',
-        'equipe': 'Equipe Sul'
+        'equipe': 'equipe_sul'
     })
     print(f"Ocorrência enviada com sucesso! ID: {resultado['id']}")
 except Exception as e:
@@ -277,8 +288,8 @@ except Exception as e:
 | `200` | OK | Requisição processada com sucesso |
 | `201` | Created | Recurso criado com sucesso |
 | `400` | Bad Request | Requisição malformada |
-| `401` | Unauthorized | Token inválido, ausente ou inativo |
-| `403` | Forbidden | Acesso negado (permissões insuficientes) |
+| `401` | Unauthorized | Token inválido ou ausente |
+| `403` | Forbidden | Token inativo (ou integração inativa) |
 | `404` | Not Found | Recurso não encontrado |
 | `422` | Unprocessable Entity | Erro de validação dos dados |
 | `500` | Internal Server Error | Erro interno do servidor |
@@ -321,13 +332,21 @@ Quando há erros de validação, a resposta inclui detalhes dos campos inválido
 
 #### 401 Unauthorized
 
-**Causa:** Token inválido, ausente ou inativo.
+**Causa:** Token inválido ou ausente.
 
 **Solução:**
 - Verifique se o token está sendo enviado no header `Authorization`
 - Verifique se o token está no formato correto: `Bearer rknf_...`
 - Verifique se o token está ativo no painel administrativo
 - Verifique se a integração associada ao token está ativa
+
+#### 403 Forbidden
+
+**Causa:** Token existe, mas está inativo (ou a integração associada está inativa).
+
+**Solução:**
+- Ative o token no painel administrativo
+- Ative a integração associada ao token
 
 #### 422 Validation Error
 
@@ -396,6 +415,8 @@ Da mesma forma, a API pode retornar 422 quando:
 
 - a equipe informada não existe no setor ou o vendedor não pertence a ela (`Equipe fora do setor`)
 - não existe regra ativa para a ocorrência no setor (`Regra inexistente no setor`)
+
+> Importante: o campo `equipe` deve usar o **nome técnico** (`teams.name`). Se você configurou “Nome de Exibição” no painel, ele é apenas para apresentação visual (dashboard/monitor) e não altera o valor que integrações devem enviar.
 
 ---
 
@@ -533,7 +554,10 @@ Ao solicitar suporte, forneça:
 
 ## Changelog
 
-### Versão 1.0 (Atual)
+### Versão 1.1 (Janeiro 2026)
+- Adicionado “Nome de Exibição” para equipes (apenas visual). **API e integrações continuam usando exclusivamente `teams.name`.**
+
+### Versão 1.0
 - Endpoint de webhook para envio de ocorrências
 - Autenticação via Bearer Token
 - Processamento assíncrono de ocorrências

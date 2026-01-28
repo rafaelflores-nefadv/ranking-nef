@@ -49,7 +49,7 @@
                 @if($goal->team)
                 <div>
                     <h3 class="text-sm font-medium text-slate-400 mb-2">Equipe</h3>
-                    <p class="text-white">{{ $goal->team->name }}</p>
+                    <p class="text-white">{{ $goal->team->display_label }}</p>
                 </div>
                 @endif
 

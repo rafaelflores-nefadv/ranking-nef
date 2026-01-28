@@ -28,7 +28,7 @@
                     <option value="">Todas as equipes</option>
                     @foreach($teams as $team)
                         <option value="{{ $team->id }}" {{ ($filters['team_id'] ?? '') === $team->id ? 'selected' : '' }}>
-                            {{ $team->name }}
+                            {{ $team->display_label }}
                         </option>
                     @endforeach
                 </select>

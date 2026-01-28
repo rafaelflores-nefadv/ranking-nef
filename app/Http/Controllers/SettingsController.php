@@ -344,11 +344,13 @@ class SettingsController extends Controller
 
         // Busca dados do ranking por equipes se o escopo incluir teams
         if (in_array($scope, ['teams', 'both'], true)) {
-            $teams = Team::where('sector_id', $sectorId)->orderBy('name')->get(['id', 'name']);
+            $teams = Team::where('sector_id', $sectorId)
+                ->orderBy('name')
+                ->get(['id', 'name', 'display_name']);
             foreach ($teams as $team) {
                 $teamTop = $this->getTopSellers($season->id, $team->id, $sectorId);
                 if ($teamTop->isNotEmpty()) {
-                    $texts[] = $this->buildRankingText("Top 3 da equipe {$team->name}:", $teamTop->all(), $precision);
+                    $texts[] = $this->buildRankingText("Top 3 da equipe {$team->display_label}:", $teamTop->all(), $precision);
                 }
             }
         }
@@ -723,6 +725,8 @@ class SettingsController extends Controller
             abort(403, 'Acesso negado');
         }
 
+        $sectorId = app(\App\Services\SectorService::class)->resolveSectorIdForRequest($request);
+
         // Verificar se o tema existe
         $themePath = resource_path("views/monitors/themes/{$theme}");
         $dashboardPath = $themePath . '/dashboard.blade.php';
@@ -734,7 +738,10 @@ class SettingsController extends Controller
 
         // Buscar um monitor ativo para preview, ou criar um monitor fictício
         $monitor = \App\Models\Monitor::where('is_active', true)
-            ->where('sector_id', $sectorId)
+            ->where(function ($q) use ($sectorId) {
+                $q->whereHas('sectors', fn ($sq) => $sq->where('sectors.id', $sectorId))
+                    ->orWhere('sector_id', $sectorId); // fallback legacy
+            })
             ->first();
         
         if (!$monitor) {
@@ -749,12 +756,16 @@ class SettingsController extends Controller
         }
 
         $settings = $monitor->getMergedSettings();
+        $allowedTeamIds = $monitor->getAllowedTeamIds();
+        $explicitTeams = !empty($allowedTeamIds);
         
         // Usar GamificationService para construir dados
         $gamificationService = app(\App\Services\GamificationService::class);
         
         // Obter dados do dashboard (sem filtro de usuário - público)
-        $teams = Team::where('sector_id', $sectorId)->orderBy('name')->get(['id', 'name']);
+        $teams = Team::where('sector_id', $sectorId)
+            ->orderBy('name')
+            ->get(['id', 'name', 'display_name']);
         $activeTeam = null;
 
         // Buscar temporada ativa para preview
@@ -783,7 +794,7 @@ class SettingsController extends Controller
                 'badge' => $gamification['badge'],
                 'progress' => $gamification['progress'],
                 'position' => 0,
-                'team' => $seller->team?->name,
+                'team' => $seller->team?->display_label,
                 'season' => $seller->season?->name,
             ];
         })->values();
@@ -824,12 +835,14 @@ class SettingsController extends Controller
         $dashboardConfig = [
             'refresh_interval' => $settings['refresh_interval'] ?? 30000,
             'auto_rotate_teams' => (bool)($settings['auto_rotate_teams'] ?? true),
-            'teams' => $settings['teams'] ?? [],
+            'teams' => $explicitTeams ? $allowedTeamIds : [],
             'notifications_enabled' => (bool)($settings['notifications_enabled'] ?? false),
             'sound_enabled' => (bool)($settings['sound_enabled'] ?? false),
             'voice_enabled' => $voiceEnabledValue,
             'font_scale' => $settings['font_scale'] ?? 1.0,
             'monitor_slug' => $monitor->slug,
+            'sector_ids' => [$sectorId],
+            'sector_id' => $sectorId,
         ];
 
         // Forçar o tema selecionado para preview

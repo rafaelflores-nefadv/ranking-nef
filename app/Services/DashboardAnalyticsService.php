@@ -255,10 +255,11 @@ class DashboardAnalyticsService
             ->select(
                 'teams.id',
                 'teams.name',
+                'teams.display_name',
                 DB::raw('SUM(scores.points) as total_receita'),
                 DB::raw('COUNT(scores.id) as total_scores')
             )
-            ->groupBy('teams.id', 'teams.name');
+            ->groupBy('teams.id', 'teams.name', 'teams.display_name');
         if ($sectorId) {
             $query->where('scores.sector_id', $sectorId)
                 ->where('teams.sector_id', $sectorId);
@@ -278,10 +279,11 @@ class DashboardAnalyticsService
             $receita = (float) $item->total_receita;
             $margem = $receita * 0.40;
             $percentual = $receita > 0 ? ($margem / $receita) * 100 : 0;
+            $displayLabel = $item->display_name ?: $item->name;
 
             return [
                 'id' => $item->id,
-                'name' => $item->name,
+                'name' => $displayLabel,
                 'receita' => $receita,
                 'margem' => $margem,
                 'percentual_mc' => round($percentual, 2),
@@ -431,7 +433,7 @@ class DashboardAnalyticsService
             $query->whereIn('id', $allowedTeamIds);
         }
 
-        return $query->get(['id', 'name']);
+        return $query->get(['id', 'name', 'display_name']);
     }
 
     /**

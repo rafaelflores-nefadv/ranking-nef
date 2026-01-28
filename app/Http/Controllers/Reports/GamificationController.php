@@ -51,7 +51,7 @@ class GamificationController extends Controller
                 'id' => $seller->id,
                 'name' => $seller->name,
                 'email' => $seller->email,
-                'team_name' => $seller->team?->name,
+                'team_name' => $seller->team?->display_label,
                 'season_name' => $seller->season?->name,
                 'points' => (float) $seller->points,
                 'level' => $gamification['level'],

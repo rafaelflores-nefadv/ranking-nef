@@ -388,11 +388,6 @@
                 const STORAGE_KEY = 'ranking_voice_last_seen';
                 let lastSeen = localStorage.getItem(STORAGE_KEY);
 
-                if (!lastSeen) {
-                    lastSeen = new Date().toISOString();
-                    localStorage.setItem(STORAGE_KEY, lastSeen);
-                }
-
                 let voicesCache = [];
                 const updateVoices = () => {
                     voicesCache = window.speechSynthesis.getVoices() || [];
@@ -438,8 +433,14 @@
                 };
 
                 const fetchVoiceEntries = async () => {
+                    if (document.visibilityState !== 'visible') {
+                        return;
+                    }
                     try {
-                        const params = new URLSearchParams({ limit: '10', since: lastSeen });
+                        const params = new URLSearchParams({ limit: '10' });
+                        if (lastSeen) {
+                            params.append('since', lastSeen);
+                        }
                         const response = await fetch(`/notifications/voice/recent?${params.toString()}`, {
                             headers: { 'Accept': 'application/json' },
                         });

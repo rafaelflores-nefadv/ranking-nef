@@ -6,14 +6,20 @@
 <div class="min-h-screen bg-[#0a0e1a] p-6">
     <div class="max-w-4xl mx-auto">
         <div class="mb-6">
-            <h1 class="text-3xl font-bold text-white mb-2">{{ $team->name }}</h1>
+            <h1 class="text-3xl font-bold text-white mb-2">{{ $team->display_label }}</h1>
             <p class="text-slate-400">Detalhes da equipe</p>
         </div>
 
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 mb-6">
             <div class="mb-4">
-                <label class="block text-sm font-medium text-slate-400 mb-1">Nome</label>
-                <p class="text-white text-xl">{{ $team->name }}</p>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Nome de Exibição</label>
+                <p class="text-white text-xl">{{ $team->display_label }}</p>
+                <p class="text-xs text-slate-500">Usado na interface e no monitor.</p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-400 mb-1">Nome Técnico</label>
+                <p class="text-white">{{ $team->name }}</p>
+                <p class="text-xs text-slate-500">Usado em integrações externas.</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-400 mb-1">Colaboradores</label>

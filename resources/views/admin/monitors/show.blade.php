@@ -47,6 +47,21 @@
                         <p class="text-white">{{ $monitor->description }}</p>
                     </div>
                     @endif
+                    <div>
+                        <span class="text-slate-400 text-sm">Setores:</span>
+                        <p class="text-white font-medium">
+                            @php
+                                $sectorNames = $monitor->sectors?->pluck('name')->filter()->values() ?? collect();
+                            @endphp
+                            @if($sectorNames->isEmpty() && $monitor->sector_id)
+                                {{ optional($monitor->sector)->name ?? 'Setor (legacy)' }}
+                            @elseif($sectorNames->isEmpty())
+                                <span class="text-slate-400">Nenhum setor configurado</span>
+                            @else
+                                {{ $sectorNames->implode(', ') }}
+                            @endif
+                        </p>
+                    </div>
                 </div>
             </div>
 
@@ -105,10 +120,13 @@
                 <div>
                     <span class="text-slate-400 text-sm">Equipes Configuradas:</span>
                     <p class="text-white font-medium">
-                        @if(empty($settings['teams']))
-                            Todas as equipes
+                        @php
+                            $explicitTeamsCount = $monitor->teams?->count() ?? 0;
+                        @endphp
+                        @if($explicitTeamsCount === 0)
+                            Todas as equipes (dentro dos setores)
                         @else
-                            {{ count($settings['teams']) }} equipe(s)
+                            {{ $explicitTeamsCount }} equipe(s)
                         @endif
                     </p>
                 </div>

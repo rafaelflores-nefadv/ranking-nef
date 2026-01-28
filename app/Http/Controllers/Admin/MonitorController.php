@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Monitor;
+use App\Models\Sector;
 use App\Models\Team;
 use App\Services\SectorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Validator;
 
 class MonitorController extends Controller
 {
@@ -24,7 +26,15 @@ class MonitorController extends Controller
         }
 
         $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
-        $monitors = Monitor::where('sector_id', $sectorId)->orderBy('name')->get();
+        $monitors = Monitor::query()
+            ->when($sectorId, function ($query) use ($sectorId) {
+                $query->where(function ($q) use ($sectorId) {
+                    $q->whereHas('sectors', fn ($sq) => $sq->where('sectors.id', $sectorId))
+                        ->orWhere('sector_id', $sectorId); // fallback legacy
+                });
+            })
+            ->orderBy('name')
+            ->get();
 
         return view('admin.monitors.index', compact('monitors'));
     }
@@ -41,9 +51,56 @@ class MonitorController extends Controller
         }
 
         $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
-        $teams = Team::where('sector_id', $sectorId)->orderBy('name')->get();
+        $defaultSectorIds = array_values(array_filter([$sectorId]));
+        $sectors = Sector::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $teams = $defaultSectorIds
+            ? Team::whereIn('sector_id', $defaultSectorIds)
+                ->orderBy('name')
+                ->get(['id', 'name', 'display_name', 'sector_id'])
+            : collect();
 
-        return view('admin.monitors.create', compact('teams'));
+        return view('admin.monitors.create', compact('teams', 'sectors', 'defaultSectorIds'));
+    }
+
+    /**
+     * Retorna equipes filtradas por setores (para carregamento dinâmico no form).
+     */
+    public function teamsForSectors(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Acesso negado');
+        }
+
+        $sectorIds = $request->query('sectors', []);
+        if (!is_array($sectorIds)) {
+            $sectorIds = [];
+        }
+        $sectorIds = array_values(array_filter($sectorIds));
+
+        $validator = Validator::make(['sectors' => $sectorIds], [
+            'sectors' => ['required', 'array', 'min:1'],
+            'sectors.*' => ['uuid', Rule::exists('sectors', 'id')->where('is_active', true)],
+        ]);
+        $validator->validate();
+
+        $teams = Team::query()
+            ->whereIn('sector_id', $sectorIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'display_name', 'sector_id'])
+            ->map(function (Team $team) {
+                return [
+                    'id' => $team->id,
+                    'name' => $team->name,
+                    'display_label' => $team->display_label,
+                    'sector_id' => $team->sector_id,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'data' => $teams,
+        ]);
     }
 
     /**
@@ -56,9 +113,14 @@ class MonitorController extends Controller
         if (!$user || $user->role !== 'admin') {
             abort(403, 'Acesso negado');
         }
-        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+        $sectorIds = $request->input('sectors', []);
+        if (!is_array($sectorIds)) {
+            $sectorIds = [];
+        }
+        $sectorIds = array_values(array_filter($sectorIds));
+        $primarySectorId = $sectorIds[0] ?? app(SectorService::class)->resolveSectorIdForRequest($request);
 
-        $validated = $request->validate([
+        $validated = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255|unique:monitors,slug',
             'description' => 'nullable|string',
@@ -66,13 +128,20 @@ class MonitorController extends Controller
             'settings' => 'nullable|json',
             'refresh_interval' => 'nullable|integer|min:5000',
             'auto_rotate_teams' => 'boolean',
+            'sectors' => ['required', 'array', 'min:1'],
+            'sectors.*' => ['uuid', Rule::exists('sectors', 'id')->where('is_active', true)],
             'teams' => 'nullable|array',
-            'teams.*' => Rule::exists('teams', 'id')->where('sector_id', $sectorId),
+            'teams.*' => [
+                'uuid',
+                Rule::exists('teams', 'id')->where(function ($query) use ($sectorIds) {
+                    return $query->whereIn('sector_id', $sectorIds);
+                }),
+            ],
             'notifications_enabled' => 'boolean',
             'sound_enabled' => 'boolean',
             'voice_enabled' => 'boolean',
             'font_scale' => 'nullable|numeric|min:0.5|max:3.0',
-        ]);
+        ])->validate();
 
         // Gerar slug se não fornecido
         if (empty($validated['slug'])) {
@@ -92,7 +161,8 @@ class MonitorController extends Controller
         $settings = [
             'refresh_interval' => $validated['refresh_interval'] ?? 30000,
             'auto_rotate_teams' => $request->boolean('auto_rotate_teams', true), // padrão true
-            'teams' => $validated['teams'] ?? [],
+            // equipes são controladas via pivot monitor_team (deixar vazio aqui)
+            'teams' => [],
             'notifications_enabled' => $request->boolean('notifications_enabled', false),
             'sound_enabled' => $request->boolean('sound_enabled', false),
             'voice_enabled' => $request->boolean('voice_enabled', false), // false se não marcado, true se marcado
@@ -106,15 +176,20 @@ class MonitorController extends Controller
                 $settings = array_merge($settings, $jsonSettings);
             }
         }
+        // Segurança: equipes devem ser controladas via pivot (não via JSON)
+        $settings['teams'] = [];
 
         $monitor = Monitor::create([
-            'sector_id' => $sectorId,
+            'sector_id' => $primarySectorId, // legacy (para compatibilidade/escopo padrão)
             'name' => $validated['name'],
             'slug' => $validated['slug'],
             'description' => $validated['description'] ?? null,
             'is_active' => $validated['is_active'] ?? true,
             'settings' => $settings,
         ]);
+
+        $monitor->sectors()->sync($sectorIds);
+        $monitor->teams()->sync($validated['teams'] ?? []);
 
         return redirect()->route('admin.monitors.index')
             ->with('success', 'Monitor criado com sucesso!');
@@ -131,6 +206,7 @@ class MonitorController extends Controller
             abort(403, 'Acesso negado');
         }
 
+        $monitor->load(['sectors:id,name', 'teams:id,name,display_name']);
         $publicUrl = route('monitor.show', $monitor->slug);
 
         return view('admin.monitors.show', compact('monitor', 'publicUrl'));
@@ -147,10 +223,25 @@ class MonitorController extends Controller
             abort(403, 'Acesso negado');
         }
 
-        $teams = Team::where('sector_id', $monitor->sector_id)->orderBy('name')->get();
-        $settings = $monitor->getMergedSettings();
+        $sectors = Sector::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $selectedSectorIds = old('sectors', $monitor->getSectorIds());
+        if (!is_array($selectedSectorIds)) {
+            $selectedSectorIds = [];
+        }
+        $selectedSectorIds = array_values(array_filter($selectedSectorIds));
 
-        return view('admin.monitors.edit', compact('monitor', 'teams', 'settings'));
+        $teams = $selectedSectorIds
+            ? Team::whereIn('sector_id', $selectedSectorIds)
+                ->orderBy('name')
+                ->get(['id', 'name', 'display_name', 'sector_id'])
+            : collect();
+        $settings = $monitor->getMergedSettings();
+        $selectedTeamIds = old('teams', $monitor->getAllowedTeamIds());
+        if (!is_array($selectedTeamIds)) {
+            $selectedTeamIds = [];
+        }
+
+        return view('admin.monitors.edit', compact('monitor', 'teams', 'settings', 'sectors', 'selectedSectorIds', 'selectedTeamIds'));
     }
 
     /**
@@ -163,9 +254,14 @@ class MonitorController extends Controller
         if (!$user || $user->role !== 'admin') {
             abort(403, 'Acesso negado');
         }
-        $sectorId = $monitor->sector_id;
+        $sectorIds = $request->input('sectors', []);
+        if (!is_array($sectorIds)) {
+            $sectorIds = [];
+        }
+        $sectorIds = array_values(array_filter($sectorIds));
+        $primarySectorId = $sectorIds[0] ?? $monitor->sector_id;
 
-        $validated = $request->validate([
+        $validated = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255|unique:monitors,slug,' . $monitor->id,
             'description' => 'nullable|string',
@@ -173,13 +269,20 @@ class MonitorController extends Controller
             'settings' => 'nullable|json',
             'refresh_interval' => 'nullable|integer|min:5000',
             'auto_rotate_teams' => 'boolean',
+            'sectors' => ['required', 'array', 'min:1'],
+            'sectors.*' => ['uuid', Rule::exists('sectors', 'id')->where('is_active', true)],
             'teams' => 'nullable|array',
-            'teams.*' => Rule::exists('teams', 'id')->where('sector_id', $sectorId),
+            'teams.*' => [
+                'uuid',
+                Rule::exists('teams', 'id')->where(function ($query) use ($sectorIds) {
+                    return $query->whereIn('sector_id', $sectorIds);
+                }),
+            ],
             'notifications_enabled' => 'boolean',
             'sound_enabled' => 'boolean',
             'voice_enabled' => 'boolean',
             'font_scale' => 'nullable|numeric|min:0.5|max:3.0',
-        ]);
+        ])->validate();
 
         // Atualizar slug se fornecido
         if (!empty($validated['slug']) && $validated['slug'] !== $monitor->slug) {
@@ -201,7 +304,8 @@ class MonitorController extends Controller
             'auto_rotate_teams' => $request->has('auto_rotate_teams') 
                 ? $request->boolean('auto_rotate_teams', true) 
                 : ($currentSettings['auto_rotate_teams'] ?? true),
-            'teams' => $validated['teams'] ?? $currentSettings['teams'] ?? [],
+            // equipes são controladas via pivot monitor_team (deixar vazio aqui)
+            'teams' => [],
             'notifications_enabled' => $request->has('notifications_enabled') 
                 ? $request->boolean('notifications_enabled', false) 
                 : ($currentSettings['notifications_enabled'] ?? false),
@@ -221,13 +325,19 @@ class MonitorController extends Controller
                 $settings = array_merge($settings, $jsonSettings);
             }
         }
+        // Segurança: equipes devem ser controladas via pivot (não via JSON)
+        $settings['teams'] = [];
 
         $monitor->update([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'is_active' => $validated['is_active'] ?? true,
             'settings' => $settings,
+            'sector_id' => $primarySectorId, // legacy
         ]);
+
+        $monitor->sectors()->sync($sectorIds);
+        $monitor->teams()->sync($validated['teams'] ?? []);
 
         return redirect()->route('admin.monitors.index')
             ->with('success', 'Monitor atualizado com sucesso!');

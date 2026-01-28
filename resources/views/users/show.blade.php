@@ -52,7 +52,7 @@
                     <div class="flex flex-wrap gap-2">
                         @foreach($user->teams as $team)
                             <span class="px-3 py-1 bg-blue-600/20 text-blue-400 rounded-full text-sm">
-                                {{ $team->name }}
+                                {{ $team->display_label }}
                             </span>
                         @endforeach
                     </div>

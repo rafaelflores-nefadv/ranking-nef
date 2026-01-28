@@ -82,7 +82,7 @@
                                 <input type="checkbox" name="teams[]" value="{{ $team->id }}"
                                     {{ in_array($team->id, old('teams', [])) ? 'checked' : '' }}
                                     class="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2">
-                                <span>{{ $team->name }}</span>
+                                <span>{{ $team->display_label }}</span>
                             </label>
                         @empty
                             <p class="text-sm text-slate-400">Nenhuma equipe cadastrada</p>

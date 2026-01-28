@@ -67,6 +67,20 @@
                         <p class="mt-1 text-xs text-slate-400 ml-6">Monitores inativos não são acessíveis publicamente</p>
                     </div>
 
+                    <!-- Setores -->
+                    <div>
+                        <label for="sectors" class="block text-sm font-medium text-slate-300 mb-2">Setores para exibição *</label>
+                        <select id="sectors" name="sectors[]" multiple required
+                                class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            @foreach($sectors as $sector)
+                                <option value="{{ $sector->id }}" {{ in_array($sector->id, old('sectors', $defaultSectorIds ?? [])) ? 'selected' : '' }}>
+                                    {{ $sector->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-slate-400">Selecione um ou mais setores. O monitor ficará isolado por esses setores.</p>
+                    </div>
+
                     <div class="border-t border-slate-700/50 pt-6">
                         <h3 class="text-lg font-semibold text-white mb-4">Configurações</h3>
 
@@ -91,21 +105,20 @@
                         <!-- Equipes permitidas -->
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-slate-300 mb-2">Equipes para Exibir</label>
-                            <div class="space-y-2 max-h-40 overflow-y-auto bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
-                                <label class="flex items-center gap-2">
-                                    <input type="checkbox" id="select-all-teams" 
-                                           class="w-4 h-4 bg-slate-800 border-slate-700 rounded text-blue-600 focus:ring-blue-500">
-                                    <span class="text-sm text-slate-300">Selecionar todas (deixe desmarcado para todas)</span>
-                                </label>
-                                @foreach($teams as $team)
-                                <label class="flex items-center gap-2">
-                                    <input type="checkbox" name="teams[]" value="{{ $team->id }}" {{ in_array($team->id, old('teams', [])) ? 'checked' : '' }}
-                                           class="w-4 h-4 bg-slate-800 border-slate-700 rounded text-blue-600 focus:ring-blue-500 team-checkbox">
-                                    <span class="text-sm text-slate-300">{{ $team->name }}</span>
-                                </label>
-                                @endforeach
+                            <div id="teams-container" class="space-y-2 max-h-56 overflow-y-auto bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                                @if($teams->isEmpty())
+                                    <p class="text-xs text-slate-400">Selecione ao menos um setor para carregar as equipes.</p>
+                                @else
+                                    @foreach($teams as $team)
+                                        <label class="flex items-center gap-2">
+                                            <input type="checkbox" name="teams[]" value="{{ $team->id }}" {{ in_array($team->id, old('teams', [])) ? 'checked' : '' }}
+                                                   class="w-4 h-4 bg-slate-800 border-slate-700 rounded text-blue-600 focus:ring-blue-500 team-checkbox">
+                                            <span class="text-sm text-slate-300">{{ $team->display_label }}</span>
+                                        </label>
+                                    @endforeach
+                                @endif
                             </div>
-                            <p class="mt-1 text-xs text-slate-400">Selecione equipes específicas ou deixe vazio para mostrar todas</p>
+                            <p id="teams-help" class="mt-1 text-xs text-slate-400">Se nenhuma equipe for selecionada, serão consideradas todas as equipes dos setores escolhidos.</p>
                         </div>
 
                         <!-- Notificações -->
@@ -178,20 +191,100 @@
         }
     });
 
-    // Selecionar/deselecionar todas as equipes
-    document.getElementById('select-all-teams').addEventListener('change', function() {
-        const checkboxes = document.querySelectorAll('.team-checkbox');
-        checkboxes.forEach(cb => cb.checked = this.checked);
-    });
+    // Carregar equipes dinamicamente conforme setores selecionados
+    (function initMonitorSectorsTeams() {
+        const sectorsSelect = document.getElementById('sectors');
+        const teamsContainer = document.getElementById('teams-container');
+        const teamsHelp = document.getElementById('teams-help');
+        const teamsEndpoint = @json(route('admin.monitors.teams-for-sectors'));
 
-    // Atualizar checkbox "selecionar todas"
-    document.querySelectorAll('.team-checkbox').forEach(cb => {
-        cb.addEventListener('change', function() {
-            const allCheckboxes = document.querySelectorAll('.team-checkbox');
-            const checked = Array.from(allCheckboxes).filter(cb => cb.checked);
-            document.getElementById('select-all-teams').checked = checked.length === allCheckboxes.length;
+        if (!sectorsSelect || !teamsContainer) return;
+
+        const sectorNameMap = new Map(
+            (@json($sectors->map(fn($s) => ['id' => $s->id, 'name' => $s->name])->values()->all()))
+                .map((s) => [s.id, s.name])
+        );
+
+        let selectedTeamIds = new Set(@json(old('teams', [])));
+
+        const getSelectedSectorIds = () => {
+            return Array.from(sectorsSelect.selectedOptions).map((opt) => opt.value).filter(Boolean);
+        };
+
+        const clearTeamsSelection = () => {
+            selectedTeamIds = new Set();
+            const existing = teamsContainer.querySelectorAll('input[name="teams[]"]');
+            existing.forEach((el) => el.checked = false);
+        };
+
+        const renderTeams = (teams) => {
+            teamsContainer.innerHTML = '';
+            if (!teams.length) {
+                const p = document.createElement('p');
+                p.className = 'text-xs text-slate-400';
+                p.textContent = 'Nenhuma equipe encontrada para os setores selecionados.';
+                teamsContainer.appendChild(p);
+                return;
+            }
+
+            teams.forEach((team) => {
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-2';
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.name = 'teams[]';
+                input.value = team.id;
+                input.className = 'w-4 h-4 bg-slate-800 border-slate-700 rounded text-blue-600 focus:ring-blue-500 team-checkbox';
+                input.checked = selectedTeamIds.has(team.id);
+                input.addEventListener('change', () => {
+                    if (input.checked) selectedTeamIds.add(team.id);
+                    else selectedTeamIds.delete(team.id);
+                });
+
+                const span = document.createElement('span');
+                span.className = 'text-sm text-slate-300';
+                const sectorName = sectorNameMap.get(team.sector_id);
+                const teamLabel = team.display_label || team.name;
+                span.textContent = sectorName ? `${teamLabel} (${sectorName})` : teamLabel;
+
+                label.appendChild(input);
+                label.appendChild(span);
+                teamsContainer.appendChild(label);
+            });
+        };
+
+        const loadTeams = async ({ clearSelection = false } = {}) => {
+            const sectorIds = getSelectedSectorIds();
+            if (!sectorIds.length) {
+                teamsContainer.innerHTML = '<p class="text-xs text-slate-400">Selecione ao menos um setor para carregar as equipes.</p>';
+                if (teamsHelp) teamsHelp.textContent = 'Selecione setores para definir o escopo. Se nenhuma equipe for selecionada, serão consideradas todas as equipes dos setores.';
+                clearTeamsSelection();
+                return;
+            }
+            if (clearSelection) {
+                clearTeamsSelection();
+            }
+            const url = new URL(teamsEndpoint, window.location.origin);
+            sectorIds.forEach((id) => url.searchParams.append('sectors[]', id));
+
+            const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+            if (!response.ok) {
+                teamsContainer.innerHTML = '<p class="text-xs text-red-400">Erro ao carregar equipes. Tente novamente.</p>';
+                return;
+            }
+            const result = await response.json();
+            const teams = result?.data || [];
+            renderTeams(teams);
+        };
+
+        sectorsSelect.addEventListener('change', () => {
+            // Regra: ao alterar setores, limpar automaticamente as equipes selecionadas
+            loadTeams({ clearSelection: true });
         });
-    });
+
+        // Inicial: garantir que lista esteja consistente com setores selecionados
+        loadTeams({ clearSelection: false });
+    })();
 </script>
 @endpush
 @endsection

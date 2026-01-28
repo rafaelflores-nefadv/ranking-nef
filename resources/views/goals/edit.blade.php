@@ -78,7 +78,7 @@
                         <option value="">Selecione uma equipe</option>
                         @foreach($teams as $team)
                             <option value="{{ $team->id }}" {{ old('team_id', $goal->team_id) == $team->id ? 'selected' : '' }}>
-                                {{ $team->name }}
+                                {{ $team->display_label }}
                             </option>
                         @endforeach
                     </select>
@@ -95,7 +95,7 @@
                         <option value="">Selecione um vendedor</option>
                         @foreach($sellers as $seller)
                             <option value="{{ $seller->id }}" {{ old('seller_id', $goal->seller_id) == $seller->id ? 'selected' : '' }}>
-                                {{ $seller->name }} ({{ $seller->team->name ?? 'Sem equipe' }})
+                                {{ $seller->name }} ({{ $seller->team?->display_label ?? 'Sem equipe' }})
                             </option>
                         @endforeach
                     </select>

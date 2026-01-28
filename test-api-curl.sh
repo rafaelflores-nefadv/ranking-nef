@@ -2,7 +2,7 @@
 
 # Script de Teste da API - Ranking NEF (Bash/cURL)
 # 
-# Este script testa o envio de ocorrências via API usando o token REVO fornecido.
+# Este script testa o envio de ocorrências via API usando um token de integração.
 # 
 # Uso:
 #   chmod +x test-api-curl.sh
@@ -13,13 +13,18 @@
 # ============================================
 
 # URL base da API (ajuste conforme necessário)
-BASE_URL="http://localhost:8000"  # ou "https://seu-dominio.com"
+BASE_URL="${RANKING_NEF_BASE_URL:-http://localhost:8000}"  # ou "https://seu-dominio.com"
 
-# Token REVO fornecido
-TOKEN="rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1"
+# Token da integração (defina em RANKING_NEF_API_TOKEN)
+TOKEN="${RANKING_NEF_API_TOKEN:-}"
+
+if [ -z "$TOKEN" ]; then
+  echo "ERRO: defina a variável de ambiente RANKING_NEF_API_TOKEN com o token da integração."
+  exit 1
+fi
 
 # Dados do usuário de teste
-USUARIO_EMAIL="teste@extranef.com.br"
+USUARIO_EMAIL="${RANKING_NEF_TEST_IDENTIFIER:-vendedor@empresa.com}"
 USUARIO_NOME="Teste"
 
 # ============================================
@@ -85,7 +90,7 @@ echo "Usuário de Teste:"
 echo "  Nome: $USUARIO_NOME"
 echo "  Email: $USUARIO_EMAIL"
 echo ""
-echo "Token REVO: ${TOKEN:0:20}..."
+echo "Token: ${TOKEN:0:20}..."
 echo "URL Base: $BASE_URL"
 echo ""
 
@@ -105,7 +110,8 @@ enviar_ocorrencia "$USUARIO_EMAIL" "30.8 -  BOLETO PAGO" "Cliente Teste LTDA"
 echo "============================================================"
 echo "TESTE 3: Ocorrência com Credor e Equipe"
 echo "============================================================"
-enviar_ocorrencia "$USUARIO_EMAIL" "30.6 - BOLETO ENVIADO" "Cliente Teste LTDA" "Equipe Teste"
+# Nota: "equipe" deve ser o nome técnico (teams.name), usado pelas integrações/API.
+enviar_ocorrencia "$USUARIO_EMAIL" "30.6 - BOLETO ENVIADO" "Cliente Teste LTDA" "equipe_teste"
 
 echo ""
 echo "============================================================"

@@ -16,7 +16,17 @@ class Team extends Model
     protected $fillable = [
         'sector_id',
         'name',
+        'display_name',
     ];
+
+    protected $hidden = [
+        'display_name',
+    ];
+
+    public function getDisplayLabelAttribute(): string
+    {
+        return $this->display_name ?: $this->name;
+    }
 
     /**
      * Get the sellers that belong to this team.

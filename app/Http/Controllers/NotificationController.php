@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Monitor;
 use App\Models\NotificationHistory;
 use App\Models\Score;
 use App\Services\SectorService;
@@ -51,13 +52,35 @@ class NotificationController extends Controller
         ]);
 
         $limit = $validated['limit'] ?? 10;
-        $since = isset($validated['since']) ? Carbon::parse($validated['since']) : null;
-        $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+        $since = isset($validated['since'])
+            ? Carbon::parse($validated['since'], 'UTC')->utc()
+            : null;
+        $sectorId = null;
+        $sectorIds = null;
+        $monitorSlug = $request->query('monitor');
+        if ($monitorSlug) {
+            $monitor = Monitor::where('slug', $monitorSlug)
+                ->where('is_active', true)
+                ->first();
+            if (!$monitor) {
+                abort(404, 'Monitor não encontrado');
+            }
+            $sectorIds = $monitor->getSectorIds();
+            if (empty($sectorIds) && $monitor->sector_id) {
+                $sectorIds = [$monitor->sector_id];
+            }
+            $sectorIds = array_values(array_filter($sectorIds ?: []));
+        }
+
+        if (!$sectorIds) {
+            $sectorId = app(SectorService::class)->resolveSectorIdForRequest($request);
+            $sectorIds = $sectorId ? [$sectorId] : [];
+        }
 
         $query = NotificationHistory::where('type', 'voice_ranking')
             ->orderBy('created_at', 'desc');
-        if ($sectorId) {
-            $query->where('sector_id', $sectorId);
+        if (!empty($sectorIds)) {
+            $query->whereIn('sector_id', $sectorIds);
         }
 
         if ($since) {
@@ -72,7 +95,7 @@ class NotificationController extends Controller
                     'id' => $history->id,
                     'scope' => $history->scope,
                     'content' => $history->content,
-                    'created_at' => $history->created_at?->toIso8601String(),
+                    'created_at' => $history->created_at?->copy()->utc()->toIso8601String(),
                 ];
             }),
         ]);

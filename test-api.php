@@ -3,7 +3,7 @@
 /**
  * Script de Teste da API - Ranking NEF
  * 
- * Este script testa o envio de ocorrências via API usando o token REVO fornecido.
+ * Este script testa o envio de ocorrências via API usando um token de integração.
  * 
  * Uso:
  *   php test-api.php
@@ -16,15 +16,23 @@
 // ============================================
 
 // URL base da API (ajuste conforme necessário)
-$baseUrl = 'http://localhost:8000'; // ou 'https://seu-dominio.com'
+$baseUrl = getenv('RANKING_NEF_BASE_URL') ?: 'http://localhost:8000'; // ou 'https://seu-dominio.com'
 
-// Token REVO fornecido
-$token = 'rknf_LEQRc2mBKNviubO9rQijMNFrT4fwQAO1';
+// Token da integração (defina em RANKING_NEF_API_TOKEN)
+$token = getenv('RANKING_NEF_API_TOKEN') ?: '';
 
-// Dados do usuário de teste
+if ($token === '') {
+    fwrite(STDERR, "ERRO: defina a variável de ambiente RANKING_NEF_API_TOKEN com o token da integração.\n");
+    exit(1);
+}
+
+// Identificador do vendedor (email ou external_code, conforme o token)
+$identifier = getenv('RANKING_NEF_TEST_IDENTIFIER') ?: 'vendedor@empresa.com';
+
+// Dados do usuário de teste (apenas para exibição)
 $usuario = [
     'nome' => 'Teste',
-    'email' => 'teste@extranef.com.br',
+    'email' => $identifier,
     'pontos' => 0,
     'equipe' => null, // ou nome da equipe se houver
     'status' => 'Ativo'
@@ -148,7 +156,7 @@ echo "  Pontos Atuais: {$usuario['pontos']}\n";
 echo "  Equipe: " . ($usuario['equipe'] ?? 'Nenhuma') . "\n";
 echo "  Status: {$usuario['status']}\n";
 echo "\n";
-echo "Token REVO: " . substr($token, 0, 20) . "...\n";
+echo "Token: " . substr($token, 0, 20) . "...\n";
 echo "URL Base: {$baseUrl}\n";
 echo "\n";
 

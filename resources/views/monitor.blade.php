@@ -86,7 +86,7 @@
                         </svg>
                     </div>
                     <div>
-                        <h2 class="text-white font-bold">Ranking de {{ $saleTermLower }}<span id="ranking-team-name">{{ $activeTeam ? ' - ' . $activeTeam->name : '' }}</span></h2>
+                        <h2 class="text-white font-bold">Ranking de {{ $saleTermLower }}<span id="ranking-team-name">{{ $activeTeam ? ' - ' . $activeTeam->display_label : '' }}</span></h2>
                         <p class="text-slate-400 text-xs">Por pontuação</p>
                     </div>
                 </div>
@@ -97,7 +97,7 @@
                     </a>
                     @foreach($teams as $team)
                         <a data-team-id="{{ $team->id }}" href="javascript:void(0)" class="px-2 py-1 rounded-full text-xs border {{ $activeTeam && $activeTeam->id === $team->id ? 'border-blue-500 text-blue-300' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500' }}">
-                            {{ $team->name }}
+                            {{ $team->display_label }}
                         </a>
                     @endforeach
                 </div>
@@ -219,15 +219,33 @@
     // Dados iniciais
     const teamsRotation = @json($teams->values()->map(fn($team) => ['id' => $team->id])->all());
     let teamIdsRotation = [null];
+
+    const parseBoolean = (value) => {
+        if (value === true || value === false) return value;
+        if (value === 1 || value === '1') return true;
+        if (value === 0 || value === '0') return false;
+        if (typeof value === 'string') {
+            return ['true', 'yes', 'on'].includes(value.toLowerCase());
+        }
+        return Boolean(value);
+    };
+
+    const normalizeTeamId = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        return String(value);
+    };
     
     // Filtrar equipes se houver configuração
     if (allowedTeams.length > 0) {
-        // Filtrar apenas equipes permitidas e que existem
-        const validAllowedTeams = allowedTeams.filter(id => teamsRotation.some(t => t.id === id));
-        teamIdsRotation = [null, ...validAllowedTeams];
+        // Filtrar apenas equipes permitidas e manter a ordem exibida na tela
+        const allowedSet = new Set(allowedTeams.map((id) => String(id)));
+        const orderedAllowedTeams = teamsRotation
+            .filter((team) => allowedSet.has(String(team.id)))
+            .map((team) => String(team.id));
+        teamIdsRotation = [null, ...orderedAllowedTeams];
     } else {
         // Se não há equipes especificadas, usar todas
-        teamIdsRotation = [null, ...teamsRotation.map((team) => team.id)];
+        teamIdsRotation = [null, ...teamsRotation.map((team) => String(team.id))];
     }
     
     console.log('Monitor: Configuração de rotação de equipes', {
@@ -237,7 +255,7 @@
         autoRotateTeams
     });
     
-    let currentTeamId = @json($activeTeam?->id);
+    let currentTeamId = normalizeTeamId(@json($activeTeam?->id));
     
     // Garantir que currentTeamId inicial está na rotação (se não estiver, usar null/Geral)
     if (currentTeamId && !teamIdsRotation.includes(currentTeamId)) {
@@ -382,8 +400,8 @@
         if (!teamChips) return;
         const chips = Array.from(teamChips.querySelectorAll('[data-team-id]'));
         chips.forEach((chip) => {
-            const chipTeamId = chip.dataset.teamId || null;
-            const isActive = (chipTeamId || null) === (currentTeamId || null);
+            const chipTeamId = normalizeTeamId(chip.dataset.teamId || null);
+            const isActive = chipTeamId === (currentTeamId || null);
             chip.classList.toggle('border-blue-500', isActive);
             chip.classList.toggle('text-blue-300', isActive);
             chip.classList.toggle('border-slate-700', !isActive);
@@ -480,7 +498,7 @@
         chips.forEach((chip) => {
             chip.addEventListener('click', (event) => {
                 event.preventDefault();
-                currentTeamId = chip.dataset.teamId || null;
+                currentTeamId = normalizeTeamId(chip.dataset.teamId || null);
                 updateTeamChips();
                 fetchDashboardData();
                 // Resetar o countdown ao trocar de equipe manualmente
@@ -497,13 +515,14 @@
 
     // Notificações de vendas em tempo real (polling)
     // Verificar configuração do monitor primeiro, depois do sistema
-    const monitorNotificationsEnabled = config.notifications_enabled === true || config.notifications_enabled === 'true' || config.notifications_enabled === 1;
+    const hasMonitorNotificationsSetting = config.notifications_enabled !== undefined && config.notifications_enabled !== null;
+    const monitorNotificationsEnabled = parseBoolean(config.notifications_enabled);
     const systemNotificationsEnabled = @json((($configs['notifications_system_enabled'] ?? 'true') === 'true'));
     // Notificações do monitor têm prioridade, mas devem estar habilitadas no sistema também
-    const notificationsEnabled = monitorNotificationsEnabled && systemNotificationsEnabled;
+    const notificationsEnabled = systemNotificationsEnabled && (hasMonitorNotificationsSetting ? monitorNotificationsEnabled : true);
     
     // Som: usar configuração do monitor ao recarregar (não usar localStorage)
-    const monitorSoundEnabled = config.sound_enabled === true || config.sound_enabled === 'true' || config.sound_enabled === 1;
+    const monitorSoundEnabled = parseBoolean(config.sound_enabled);
     const systemSoundEnabled = @json((($configs['notifications_sound_enabled'] ?? 'true') === 'true'));
     // Som do monitor tem prioridade se configurado, senão usa do sistema
     let soundEnabled = (config.sound_enabled !== undefined && config.sound_enabled !== null) ? monitorSoundEnabled : systemSoundEnabled;
@@ -514,8 +533,9 @@
         config: config
     });
     const notificationsContainer = document.getElementById('sale-notifications');
-    const SALES_STORAGE_KEY = `monitor_${monitorSlug}_sales_last_timestamp`;
-    const SALES_POLLING_INTERVAL = 4000;
+    const SALES_POLLING_MIN_INTERVAL = 4000;
+    const SALES_POLLING_MAX_INTERVAL = 60000;
+    const SALES_POLLING_BACKOFF_FACTOR = 1.5;
 
     // Configurações de sons
     const soundsConfig = @json(json_decode($configs['notifications_sounds_config'] ?? '{}', true) ?: []);
@@ -529,9 +549,11 @@
     @endforeach
     const notificationEventsConfig = @json($notificationEventsConfig ?? []);
 
-    let lastSaleTimestamp =
-        localStorage.getItem(SALES_STORAGE_KEY) ||
-        new Date(Date.now() - 5000).toISOString();
+    let sinceNotifications = null;
+    let salesPollingTimer = null;
+    let salesPollingDelay = SALES_POLLING_MIN_INTERVAL;
+    let salesPollingInFlight = false;
+    let lastSalesCountLog = null;
 
     const formatPoints = (points) => {
         const value = Number(points || 0);
@@ -542,7 +564,8 @@
     const saleTermLower = @json($saleTermLower);
 
     const toastQueue = [];
-    const MAX_VISIBLE_TOASTS = 2;
+    const MAX_VISIBLE_TOASTS = parseInt(@json($configs['notifications_popup_max_count'] ?? '2'), 10);
+    const AUTO_CLOSE_MS = parseInt(@json($configs['notifications_popup_auto_close_seconds'] ?? '7'), 10) * 1000;
 
     const getVisibleToasts = () => {
         if (!notificationsContainer) return [];
@@ -593,7 +616,7 @@
                 toast.remove();
                 showNextToast();
             }
-        }, 7000);
+        }, AUTO_CLOSE_MS);
 
         // Tenta preencher o segundo slot imediatamente
         showNextToast();
@@ -689,27 +712,76 @@
     const createSaleToast = (sale) => {
         if (!notificationsContainer) return;
 
+        console.log('Monitor: Renderizando notificação', {
+            id: sale?.id,
+            created_at: sale?.created_at,
+            seller: sale?.seller?.name
+        });
+
         // Adicionar à fila - o som será tocado quando a notificação aparecer na tela
         toastQueue.push(sale);
         showNextToast();
     };
 
-    const fetchRecentSales = async () => {
-        if (!notificationsEnabled) {
-            console.log('Monitor: Notificações desabilitadas', { notificationsEnabled });
+    const getNewestTimestamp = (sales) => {
+        return sales.reduce((latest, sale) => {
+            const ts = sale?.created_at;
+            if (!ts) return latest;
+            if (!latest || ts > latest) return ts;
+            return latest;
+        }, null);
+    };
+
+    const scheduleNextSalesPoll = (delayMs) => {
+        if (salesPollingTimer) {
+            clearTimeout(salesPollingTimer);
+        }
+        if (!notificationsEnabled || document.visibilityState !== 'visible') {
             return;
         }
+        salesPollingTimer = setTimeout(() => {
+            fetchRecentSales();
+        }, delayMs);
+    };
+
+    const updateSalesPollingDelay = (hasData) => {
+        if (hasData) {
+            salesPollingDelay = SALES_POLLING_MIN_INTERVAL;
+            return;
+        }
+        salesPollingDelay = Math.min(
+            SALES_POLLING_MAX_INTERVAL,
+            Math.round(salesPollingDelay * SALES_POLLING_BACKOFF_FACTOR)
+        );
+    };
+
+    const fetchRecentSales = async () => {
+        if (!notificationsEnabled) {
+            return;
+        }
+        if (document.visibilityState !== 'visible') {
+            return;
+        }
+        if (salesPollingInFlight) {
+            return;
+        }
+        salesPollingInFlight = true;
 
         const params = new URLSearchParams();
-        if (lastSaleTimestamp) {
-            params.append('since', lastSaleTimestamp);
+        if (sinceNotifications) {
+            params.append('since', sinceNotifications);
+        }
+        if (config.monitor_slug) {
+            params.append('monitor', config.monitor_slug);
+        }
+        if (config.sector_id) {
+            params.append('sector', config.sector_id);
         }
         params.append('limit', '20');
 
         try {
             const url = `/scores/recent?${params.toString()}`;
-            console.log('Monitor: Buscando vendas recentes', { url, lastSaleTimestamp });
-            
+            console.log('Monitor: Buscando vendas recentes', { url });
             const response = await fetch(url, {
                 headers: { 'Accept': 'application/json' },
             });
@@ -721,19 +793,32 @@
 
             const result = await response.json();
             const sales = result?.data || [];
+            console.log('Monitor: Payload de vendas recebido', { count: sales.length, payload: sales });
             
-            console.log('Monitor: Vendas recebidas', { count: sales.length, sales });
-
             if (sales.length > 0) {
                 sales.forEach(createSaleToast);
-                const newestTimestamp = sales[sales.length - 1]?.created_at;
-                if (newestTimestamp) {
-                    lastSaleTimestamp = newestTimestamp;
-                    localStorage.setItem(SALES_STORAGE_KEY, lastSaleTimestamp);
+                const newestTimestamp = getNewestTimestamp(sales);
+                if (newestTimestamp && newestTimestamp !== sinceNotifications) {
+                    sinceNotifications = newestTimestamp;
                 }
+                if (lastSalesCountLog !== sales.length) {
+                    console.log('Monitor: Novas vendas recebidas', { count: sales.length });
+                    lastSalesCountLog = sales.length;
+                }
+                updateSalesPollingDelay(true);
+            } else {
+                if (lastSalesCountLog !== 0) {
+                    console.log('Monitor: Nenhuma nova venda');
+                    lastSalesCountLog = 0;
+                }
+                updateSalesPollingDelay(false);
             }
         } catch (error) {
             console.error('Monitor: Erro ao buscar vendas recentes:', error);
+            updateSalesPollingDelay(false);
+        } finally {
+            salesPollingInFlight = false;
+            scheduleNextSalesPoll(salesPollingDelay);
         }
     };
 
@@ -905,165 +990,71 @@
                 });
             };
 
-            // Buscar notificações de voz recentes
             try {
-                const voiceResponse = await fetch('/notifications/voice/recent?limit=10');
-                if (!voiceResponse.ok) {
-                    console.error('Monitor: Erro ao buscar leitura por voz');
-                    alert('Erro ao buscar leituras de voz disponíveis.');
+                const normalizedScope = ['global', 'teams', 'both'].includes(voiceScope) ? voiceScope : 'global';
+                const voiceUrl = new URL(`/monitor/${monitorSlug}/voice`, window.location.origin);
+                voiceUrl.searchParams.set('scope', normalizedScope);
+
+                const voiceTextResponse = await fetch(voiceUrl.toString(), {
+                    headers: { 'Accept': 'application/json' },
+                });
+
+                if (!voiceTextResponse.ok) {
+                    const errorData = await voiceTextResponse.json().catch(() => ({}));
+                    updateVoiceButtonState(false);
+                    showCustomAlert(
+                        'Erro ao gerar leitura',
+                        errorData.error || 'Não foi possível gerar a leitura do ranking. Tente novamente.',
+                        'error'
+                    );
                     return;
                 }
 
-                const voiceResult = await voiceResponse.json();
-                const items = voiceResult?.data || [];
-
-                if (items.length === 0) {
-                    // Se não houver notificações salvas, gerar leitura atual do ranking
-                    console.log('Monitor: Nenhuma notificação de voz encontrada, gerando leitura atual...');
-                    
-                    try {
-                        // Buscar leitura do ranking geral e todas as equipes (não apenas a selecionada)
-                        const voiceTextResponse = await fetch(`/monitor/${monitorSlug}/voice?scope=both`, {
-                            headers: { 'Accept': 'application/json' },
-                        });
-                        
-                        if (!voiceTextResponse.ok) {
-                            const errorData = await voiceTextResponse.json().catch(() => ({}));
-                            updateVoiceButtonState(false);
-                            showCustomAlert(
-                                'Erro ao gerar leitura',
-                                errorData.error || 'Não foi possível gerar a leitura do ranking. Tente novamente.',
-                                'error'
-                            );
-                            return;
-                        }
-                        
-                        const voiceTextResult = await voiceTextResponse.json();
-                        
-                        if (voiceTextResult?.content) {
-                            // Garantir que as vozes estejam carregadas
-                            if (window.speechSynthesis.getVoices().length === 0) {
-                                window.speechSynthesis.addEventListener('voiceschanged', async () => {
-                                    await speakText(voiceTextResult.content);
-                                    updateVoiceButtonState(false);
-                                }, { once: true });
-                            } else {
-                                await speakText(voiceTextResult.content);
-                                updateVoiceButtonState(false);
-                            }
-                        } else {
-                            updateVoiceButtonState(false);
-                            showCustomAlert(
-                                'Erro ao gerar leitura',
-                                'Não foi possível gerar o texto do ranking.',
-                                'error'
-                            );
-                        }
-                    } catch (error) {
-                        console.error('Monitor: Erro ao gerar leitura por voz:', error);
-                        updateVoiceButtonState(false);
-                        showCustomAlert(
-                            'Erro ao gerar leitura',
-                            'Ocorreu um erro ao tentar gerar a leitura do ranking. Verifique o console para mais detalhes.',
-                            'error'
-                        );
-                    }
+                const voiceTextResult = await voiceTextResponse.json();
+                const content = voiceTextResult?.content || '';
+                if (!content) {
+                    updateVoiceButtonState(false);
+                    showCustomAlert(
+                        'Erro ao gerar leitura',
+                        'Não foi possível gerar o texto do ranking.',
+                        'error'
+                    );
                     return;
                 }
 
-                const shouldIncludeTeams = ['teams', 'both'].includes(voiceScope);
-                const hasTeamItems = items.some((item) => item?.scope === 'team');
-
-                if (shouldIncludeTeams && !hasTeamItems) {
-                    try {
-                        const voiceTextResponse = await fetch(`/monitor/${monitorSlug}/voice?scope=both`, {
-                            headers: { 'Accept': 'application/json' },
-                        });
-
-                        if (voiceTextResponse.ok) {
-                            const voiceTextResult = await voiceTextResponse.json();
-                            if (voiceTextResult?.content) {
-                                if (window.speechSynthesis.getVoices().length === 0) {
-                                    window.speechSynthesis.addEventListener('voiceschanged', async () => {
-                                        await speakText(voiceTextResult.content);
-                                        updateVoiceButtonState(false);
-                                    }, { once: true });
-                                } else {
-                                    await speakText(voiceTextResult.content);
-                                    updateVoiceButtonState(false);
-                                }
-                                return;
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Monitor: Falha ao buscar leitura por voz completa:', error);
-                    }
-                }
-
-                // Garantir que as vozes estejam carregadas
                 if (window.speechSynthesis.getVoices().length === 0) {
                     window.speechSynthesis.addEventListener('voiceschanged', async () => {
-                        await speakAllVoiceItems(items);
+                        await speakText(content);
+                        updateVoiceButtonState(false);
                     }, { once: true });
                 } else {
-                    await speakAllVoiceItems(items);
-                }
-
-                async function speakAllVoiceItems(itemsToSpeak) {
-                    try {
-                        // Ordenar do mais antigo para o mais recente (primeiro a ser lido)
-                        const ordered = itemsToSpeak.slice().reverse();
-                        
-                        for (const item of ordered) {
-                            if (item?.content) {
-                                await speakText(item.content);
-                            }
-                        }
-                    } finally {
-                        // Reabilitar botão ao terminar
-                        updateVoiceButtonState(false);
-                    }
+                    await speakText(content);
+                    updateVoiceButtonState(false);
                 }
             } catch (error) {
                 console.error('Monitor: Erro ao executar leitura por voz:', error);
                 alert('Erro ao executar leitura por voz. Verifique o console para mais detalhes.');
+                updateVoiceButtonState(false);
             }
         });
     }
 
     // Controle de polling de notificações com detecção de visibilidade
-    let salesPollingInterval = null;
-    
     const startSalesPolling = () => {
-        if (salesPollingInterval) {
-            clearInterval(salesPollingInterval);
-        }
-        if (notificationsEnabled && document.visibilityState === 'visible') {
-            fetchRecentSales();
-            salesPollingInterval = setInterval(() => {
-                // Só buscar se a página estiver visível
-                if (document.visibilityState === 'visible') {
-                    fetchRecentSales();
-                }
-            }, SALES_POLLING_INTERVAL);
-        }
+        scheduleNextSalesPoll(0);
     };
     
     const stopSalesPolling = () => {
-        if (salesPollingInterval) {
-            clearInterval(salesPollingInterval);
-            salesPollingInterval = null;
+        if (salesPollingTimer) {
+            clearTimeout(salesPollingTimer);
+            salesPollingTimer = null;
         }
     };
     
     // Detectar mudanças de visibilidade da página
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            // Quando a página volta a ficar visível, atualizar o timestamp
-            // para evitar processar notificações antigas acumuladas
-            lastSaleTimestamp = new Date(Date.now() - 5000).toISOString();
-            localStorage.setItem(SALES_STORAGE_KEY, lastSaleTimestamp);
-            console.log('Monitor: Página voltou a ficar visível, timestamp atualizado para evitar acúmulo de notificações');
+            console.log('Monitor: Página visível, retomando polling de notificações');
             startSalesPolling();
         } else {
             // Quando a página perde o foco, pausar o polling

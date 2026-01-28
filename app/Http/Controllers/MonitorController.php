@@ -42,10 +42,18 @@ class MonitorController extends Controller
             'voice_enabled_type' => gettype($settings['voice_enabled'] ?? null),
         ]);
         
-        $sectorId = $monitor->sector_id ?? app(SectorService::class)->getDefaultSectorId();
+        $sectorIds = $monitor->getSectorIds();
+        if (empty($sectorIds)) {
+            $defaultSectorId = app(SectorService::class)->getDefaultSectorId();
+            $sectorIds = $defaultSectorId ? [$defaultSectorId] : [];
+        }
+
+        $allowedTeamIds = $monitor->getAllowedTeamIds();
+        $explicitTeams = !empty($allowedTeamIds);
+        $allowedTeamIdsFilter = $explicitTeams ? $allowedTeamIds : null;
 
         // Obter dados do dashboard (sem filtro de usuário - público)
-        $data = $this->buildDashboardData(null, null, $sectorId);
+        $data = $this->buildDashboardData(null, $allowedTeamIdsFilter, $sectorIds);
         $configs = Config::all()->pluck('value', 'key');
         
         // Buscar temporada ativa
@@ -71,12 +79,15 @@ class MonitorController extends Controller
         $dashboardConfig = [
             'refresh_interval' => $settings['refresh_interval'] ?? 30000,
             'auto_rotate_teams' => (bool)($settings['auto_rotate_teams'] ?? true),
-            'teams' => $settings['teams'] ?? [],
+            // equipes são controladas via pivot monitor_team; vazio = todas (dentro dos setores)
+            'teams' => $explicitTeams ? $allowedTeamIds : [],
             'notifications_enabled' => (bool)($settings['notifications_enabled'] ?? false),
             'sound_enabled' => (bool)($settings['sound_enabled'] ?? false),
             'voice_enabled' => $voiceEnabledValue, // Já convertido para boolean acima
             'font_scale' => $settings['font_scale'] ?? 1.0,
             'monitor_slug' => $monitor->slug,
+            'sector_ids' => $sectorIds,
+            'sector_id' => $sectorIds[0] ?? null, // legacy/compat
         ];
         
         // Debug: Log da configuração final
@@ -127,7 +138,11 @@ class MonitorController extends Controller
         if (!$season) {
             return response()->json(['error' => 'Nenhuma temporada ativa'], 404);
         }
-        $sectorId = $monitor->sector_id ?? app(SectorService::class)->getDefaultSectorId();
+        $sectorIds = $monitor->getSectorIds();
+        if (empty($sectorIds)) {
+            $defaultSectorId = app(SectorService::class)->getDefaultSectorId();
+            $sectorIds = $defaultSectorId ? [$defaultSectorId] : [];
+        }
 
         $precision = (int)(\App\Models\Config::where('key', 'points_precision')->value('value') ?? 2);
         $requestedScope = $request->query('scope');
@@ -142,7 +157,7 @@ class MonitorController extends Controller
         if (in_array($voiceScope, ['global', 'both'], true)) {
             $globalTop = \App\Models\Seller::query()
                 ->where('season_id', $season->id)
-                ->where('sector_id', $sectorId)
+                ->when(!empty($sectorIds), fn ($q) => $q->whereIn('sector_id', $sectorIds))
                 ->orderBy('points', 'desc')
                 ->limit(3)
                 ->get(['id', 'name', 'points']);
@@ -162,10 +177,13 @@ class MonitorController extends Controller
         if (in_array($voiceScope, ['teams', 'both', 'team'], true)) {
             // Obter equipes permitidas no monitor ou todas
             $allowedTeamIds = null;
-            if (!empty($settings['teams'])) {
-                $allowedTeamIds = $settings['teams'];
+            $explicitTeamIds = $monitor->getAllowedTeamIds();
+            if (!empty($explicitTeamIds)) {
+                $allowedTeamIds = $explicitTeamIds;
             }
-            $teamsQuery = \App\Models\Team::where('sector_id', $sectorId)->orderBy('name');
+            $teamsQuery = \App\Models\Team::query()
+                ->when(!empty($sectorIds), fn ($q) => $q->whereIn('sector_id', $sectorIds))
+                ->orderBy('name');
             if ($allowedTeamIds !== null) {
                 $teamsQuery->whereIn('id', $allowedTeamIds);
             }
@@ -175,7 +193,7 @@ class MonitorController extends Controller
                 }
                 $teamsQuery->where('id', $requestedTeamId);
             }
-            $teams = $teamsQuery->get(['id', 'name']);
+            $teams = $teamsQuery->get(['id', 'name', 'display_name']);
             if ($voiceScope === 'team' && $teams->isEmpty()) {
                 return response()->json(['error' => 'Equipe não encontrada'], 404);
             }
@@ -183,7 +201,7 @@ class MonitorController extends Controller
             foreach ($teams as $team) {
                 $teamTop = \App\Models\Seller::query()
                     ->where('season_id', $season->id)
-                    ->where('sector_id', $sectorId)
+                    ->when(!empty($sectorIds), fn ($q) => $q->whereIn('sector_id', $sectorIds))
                     ->whereHas('teams', function($query) use ($team) {
                         $query->where('teams.id', $team->id);
                     })
@@ -192,7 +210,7 @@ class MonitorController extends Controller
                     ->get(['id', 'name', 'points']);
 
                 if ($teamTop->isNotEmpty()) {
-                    $parts = ["Top 3 da equipe {$team->name}:"];
+                    $parts = ["Top 3 da equipe {$team->display_label}:"];
                     foreach ($teamTop as $index => $seller) {
                         $position = $index + 1;
                         $points = number_format((float) $seller->points, $precision, ',', '.');
@@ -227,16 +245,39 @@ class MonitorController extends Controller
             abort(404, 'Monitor inativo');
         }
 
-        $sectorId = $monitor->sector_id ?? app(SectorService::class)->getDefaultSectorId();
+        $sectorIds = $monitor->getSectorIds();
+        if (empty($sectorIds)) {
+            $defaultSectorId = app(SectorService::class)->getDefaultSectorId();
+            $sectorIds = $defaultSectorId ? [$defaultSectorId] : [];
+        }
         $enabled = (Config::where('key', 'notifications_voice_enabled')->value('value') ?? 'false') === 'true';
         $mode = Config::where('key', 'notifications_voice_mode')->value('value') ?? 'server';
         $intervalMinutes = (int) (Config::where('key', 'notifications_voice_interval_minutes')->value('value') ?? 15);
 
-        $lastRunKey = "notifications_voice_last_run_at_{$sectorId}";
-        $lastRunValue = Config::where('key', $lastRunKey)->value('value');
-        $now = Carbon::now();
-        $lastRunAt = $lastRunValue ? Carbon::parse($lastRunValue) : null;
-        $nextRunAt = $lastRunAt ? $lastRunAt->copy()->addMinutes($intervalMinutes) : $now->copy();
+        $now = Carbon::now('UTC');
+
+        $hasLastRun = false;
+        $minNextRunAt = null;
+        $maxLastRunAt = null;
+
+        foreach ($sectorIds as $sectorId) {
+            $lastRunKey = "notifications_voice_last_run_at_{$sectorId}";
+            $lastRunValue = Config::where('key', $lastRunKey)->value('value');
+            $lastRunAt = $lastRunValue ? Carbon::parse($lastRunValue, 'UTC')->utc() : null;
+            $nextRunAt = $lastRunAt ? $lastRunAt->copy()->addMinutes($intervalMinutes) : $now->copy();
+
+            if ($lastRunAt) {
+                $hasLastRun = true;
+                if (!$maxLastRunAt || $lastRunAt->greaterThan($maxLastRunAt)) {
+                    $maxLastRunAt = $lastRunAt->copy();
+                }
+            }
+            if (!$minNextRunAt || $nextRunAt->lessThan($minNextRunAt)) {
+                $minNextRunAt = $nextRunAt->copy();
+            }
+        }
+
+        $nextRunAt = $minNextRunAt ?? $now->copy();
         $remainingSeconds = max(0, $now->diffInSeconds($nextRunAt, false));
         $overdueSeconds = max(0, $nextRunAt->diffInSeconds($now, false));
 
@@ -244,9 +285,10 @@ class MonitorController extends Controller
             'enabled' => $enabled,
             'mode' => $mode,
             'interval_minutes' => $intervalMinutes,
-            'has_last_run' => (bool) $lastRunAt,
-            'last_run_at' => $lastRunAt?->toIso8601String(),
-            'next_run_at' => $nextRunAt->toIso8601String(),
+            'sector_ids' => $sectorIds,
+            'has_last_run' => (bool) $hasLastRun,
+            'last_run_at' => $maxLastRunAt?->copy()->utc()->toIso8601String(),
+            'next_run_at' => $nextRunAt->copy()->utc()->toIso8601String(),
             'remaining_seconds' => $remainingSeconds,
             'overdue_seconds' => $overdueSeconds,
         ]);
@@ -265,22 +307,27 @@ class MonitorController extends Controller
 
         $settings = $monitor->getMergedSettings();
         $teamId = $request->query('team');
-        $sectorId = $monitor->sector_id ?? app(SectorService::class)->getDefaultSectorId();
+        $sectorIds = $monitor->getSectorIds();
+        if (empty($sectorIds)) {
+            $defaultSectorId = app(SectorService::class)->getDefaultSectorId();
+            $sectorIds = $defaultSectorId ? [$defaultSectorId] : [];
+        }
 
         // Se o monitor tem equipes configuradas, usar apenas essas
         $allowedTeamIds = null;
-        if (!empty($settings['teams'])) {
-            $allowedTeamIds = $settings['teams'];
+        $explicitTeamIds = $monitor->getAllowedTeamIds();
+        if (!empty($explicitTeamIds)) {
+            $allowedTeamIds = $explicitTeamIds;
             // Se uma equipe foi selecionada mas não está nas permitidas, usar null
             if ($teamId && !in_array($teamId, $allowedTeamIds)) {
                 $teamId = null;
             }
         }
 
-        $data = $this->buildDashboardData($teamId, $allowedTeamIds, $sectorId);
+        $data = $this->buildDashboardData($teamId, $allowedTeamIds, $sectorIds);
 
         return response()->json([
-            'activeTeamName' => $data['activeTeam']?->name,
+            'activeTeamName' => $data['activeTeam']?->display_label,
             'rankingHtml' => view('dashboard.partials.ranking', [
                 'ranking' => $data['ranking'],
                 'activeTeam' => $data['activeTeam'],
@@ -299,26 +346,31 @@ class MonitorController extends Controller
     /**
      * Constrói dados do dashboard (reutilizado do DashboardController)
      */
-    private function buildDashboardData(?string $teamId, ?array $allowedTeamIds = null, ?string $sectorId = null): array
+    private function buildDashboardData(?string $teamId, ?array $allowedTeamIds = null, array $sectorIds = []): array
     {
         // Filtrar equipes
         $teamsQuery = Team::orderBy('name');
-        if ($sectorId) {
-            $teamsQuery->where('sector_id', $sectorId);
+        if (!empty($sectorIds)) {
+            $teamsQuery->whereIn('sector_id', $sectorIds);
         }
         if ($allowedTeamIds !== null) {
             $teamsQuery->whereIn('id', $allowedTeamIds);
         }
-        $teams = $teamsQuery->get(['id', 'name']);
-        
+        $teams = $teamsQuery->get(['id', 'name', 'display_name']);
+
+        // Se a equipe solicitada não existe no escopo do monitor, desconsiderar
+        if ($teamId && !$teams->contains('id', $teamId)) {
+            $teamId = null;
+        }
+
         $activeTeam = $teamId ? $teams->firstWhere('id', $teamId) : null;
 
         // Buscar temporada ativa
         $activeSeason = Season::where('is_active', true)->first();
 
         $sellersQuery = Seller::with(['teams', 'season']);
-        if ($sectorId) {
-            $sellersQuery->where('sector_id', $sectorId);
+        if (!empty($sectorIds)) {
+            $sellersQuery->whereIn('sector_id', $sectorIds);
         }
         
         // Filtrar por temporada ativa (apenas vendedores da temporada atual)
@@ -363,7 +415,7 @@ class MonitorController extends Controller
                 'badge' => $gamification['badge'],
                 'progress' => $gamification['progress'],
                 'position' => 0,
-                'team' => $seller->teams->first()?->name,
+                'team' => $seller->teams->first()?->display_label,
                 'season' => $seller->season?->name,
             ];
         })->values();

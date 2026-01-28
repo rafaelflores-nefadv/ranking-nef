@@ -66,7 +66,7 @@ class RankingGeneralController extends Controller
         if ($allowedTeamIds !== null) {
             $teamsQuery->whereIn('id', $allowedTeamIds);
         }
-        $teams = $teamsQuery->get();
+        $teams = $teamsQuery->get(['id', 'name', 'display_name']);
 
         // Exportação
         if ($request->query('export') === 'csv') {

@@ -62,7 +62,7 @@
                         <option value="">Todas</option>
                         @foreach($teams as $team)
                             <option value="{{ $team->id }}" {{ $teamId == $team->id ? 'selected' : '' }}>
-                                {{ $team->name }}
+                                {{ $team->display_label }}
                             </option>
                         @endforeach
                     </select>

@@ -140,6 +140,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin/monitors')->name('admin.monitors.')->group(function () {
         Route::get('/', [AdminMonitorController::class, 'index'])->name('index');
         Route::get('/create', [AdminMonitorController::class, 'create'])->name('create');
+        Route::get('/teams', [AdminMonitorController::class, 'teamsForSectors'])->name('teams-for-sectors');
         Route::post('/', [AdminMonitorController::class, 'store'])->name('store');
         Route::get('/{monitor}', [AdminMonitorController::class, 'show'])->name('show');
         Route::get('/{monitor}/edit', [AdminMonitorController::class, 'edit'])->name('edit');

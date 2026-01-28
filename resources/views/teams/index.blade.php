@@ -30,7 +30,7 @@
             @forelse($teams as $team)
             <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xl font-bold text-white">{{ $team->name }}</h3>
+                    <h3 class="text-xl font-bold text-white">{{ $team->display_label }}</h3>
                     <div class="flex items-center gap-3">
                         @can('update', $team)
                         <a href="{{ route('teams.edit', $team) }}" class="text-yellow-400 hover:text-yellow-300 transition-colors" title="Editar equipe">

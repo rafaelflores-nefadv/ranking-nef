@@ -86,7 +86,7 @@
                         </svg>
                     </div>
                     <div>
-                        <h2 class="text-white font-bold">Ranking de {{ $saleTermLower }}<span id="ranking-team-name">{{ $activeTeam ? ' - ' . $activeTeam->name : '' }}</span></h2>
+                        <h2 class="text-white font-bold">Ranking de {{ $saleTermLower }}<span id="ranking-team-name">{{ $activeTeam ? ' - ' . $activeTeam->display_label : '' }}</span></h2>
                         <p class="text-slate-400 text-xs">Por pontuação</p>
                     </div>
                 </div>
@@ -97,7 +97,7 @@
                     </a>
                     @foreach($teams as $team)
                         <a data-team-id="{{ $team->id }}" href="javascript:void(0)" class="px-2 py-1 rounded-full text-xs border {{ $activeTeam && $activeTeam->id === $team->id ? 'border-blue-500 text-blue-300' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500' }}">
-                            {{ $team->name }}
+                            {{ $team->display_label }}
                         </a>
                     @endforeach
                 </div>
@@ -188,6 +188,7 @@
 <script>
     // Configuração do monitor vindo de window.DASHBOARD_CONFIG
     const config = window.DASHBOARD_CONFIG || {};
+    window.MONITOR_VOICE_AUTOMATION_HANDLED = true;
     // Pegar slug do monitor da URL ou da config
     const monitorSlug = config.monitor_slug || @json($monitor->slug ?? '') || window.location.pathname.match(/\/monitor\/([^\/]+)/)?.[1] || '';
     
@@ -283,15 +284,33 @@
     // Dados iniciais
     const teamsRotation = @json($teams->values()->map(fn($team) => ['id' => $team->id])->all());
     let teamIdsRotation = [null];
+
+    const parseBoolean = (value) => {
+        if (value === true || value === false) return value;
+        if (value === 1 || value === '1') return true;
+        if (value === 0 || value === '0') return false;
+        if (typeof value === 'string') {
+            return ['true', 'yes', 'on'].includes(value.toLowerCase());
+        }
+        return Boolean(value);
+    };
+
+    const normalizeTeamId = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        return String(value);
+    };
     
     // Filtrar equipes se houver configuração
     if (allowedTeams.length > 0) {
-        // Filtrar apenas equipes permitidas e que existem
-        const validAllowedTeams = allowedTeams.filter(id => teamsRotation.some(t => t.id === id));
-        teamIdsRotation = [null, ...validAllowedTeams];
+        // Filtrar apenas equipes permitidas e manter a ordem exibida na tela
+        const allowedSet = new Set(allowedTeams.map((id) => String(id)));
+        const orderedAllowedTeams = teamsRotation
+            .filter((team) => allowedSet.has(String(team.id)))
+            .map((team) => String(team.id));
+        teamIdsRotation = [null, ...orderedAllowedTeams];
     } else {
         // Se não há equipes especificadas, usar todas
-        teamIdsRotation = [null, ...teamsRotation.map((team) => team.id)];
+        teamIdsRotation = [null, ...teamsRotation.map((team) => String(team.id))];
     }
     
     console.log('Monitor: Configuração de rotação de equipes', {
@@ -301,7 +320,7 @@
         autoRotateTeams
     });
     
-    let currentTeamId = @json($activeTeam?->id);
+    let currentTeamId = normalizeTeamId(@json($activeTeam?->id));
     
     // Garantir que currentTeamId inicial está na rotação (se não estiver, usar null/Geral)
     if (currentTeamId && !teamIdsRotation.includes(currentTeamId)) {
@@ -446,8 +465,8 @@
         if (!teamChips) return;
         const chips = Array.from(teamChips.querySelectorAll('[data-team-id]'));
         chips.forEach((chip) => {
-            const chipTeamId = chip.dataset.teamId || null;
-            const isActive = (chipTeamId || null) === (currentTeamId || null);
+            const chipTeamId = normalizeTeamId(chip.dataset.teamId || null);
+            const isActive = chipTeamId === (currentTeamId || null);
             chip.classList.toggle('border-blue-500', isActive);
             chip.classList.toggle('text-blue-300', isActive);
             chip.classList.toggle('border-slate-700', !isActive);
@@ -550,7 +569,7 @@
                 if (voiceSyncState.state !== 'idle') {
                     return;
                 }
-                currentTeamId = chip.dataset.teamId || null;
+                currentTeamId = normalizeTeamId(chip.dataset.teamId || null);
                 updateTeamChips();
                 fetchDashboardData();
                 // Resetar o countdown ao trocar de equipe manualmente
@@ -567,13 +586,14 @@
 
     // Notificações de vendas em tempo real (polling)
     // Verificar configuração do monitor primeiro, depois do sistema
-    const monitorNotificationsEnabled = config.notifications_enabled === true || config.notifications_enabled === 'true' || config.notifications_enabled === 1;
+    const hasMonitorNotificationsSetting = config.notifications_enabled !== undefined && config.notifications_enabled !== null;
+    const monitorNotificationsEnabled = parseBoolean(config.notifications_enabled);
     const systemNotificationsEnabled = @json((($configs['notifications_system_enabled'] ?? 'true') === 'true'));
     // Notificações do monitor têm prioridade, mas devem estar habilitadas no sistema também
-    const notificationsEnabled = monitorNotificationsEnabled && systemNotificationsEnabled;
+    const notificationsEnabled = systemNotificationsEnabled && (hasMonitorNotificationsSetting ? monitorNotificationsEnabled : true);
     
     // Som: usar configuração do monitor ao recarregar (não usar localStorage)
-    const monitorSoundEnabled = config.sound_enabled === true || config.sound_enabled === 'true' || config.sound_enabled === 1;
+    const monitorSoundEnabled = parseBoolean(config.sound_enabled);
     const systemSoundEnabled = @json((($configs['notifications_sound_enabled'] ?? 'true') === 'true'));
     // Som do monitor tem prioridade se configurado, senão usa do sistema
     let soundEnabled = (config.sound_enabled !== undefined && config.sound_enabled !== null) ? monitorSoundEnabled : systemSoundEnabled;
@@ -584,8 +604,9 @@
         config: config
     });
     const notificationsContainer = document.getElementById('sale-notifications');
-    const SALES_STORAGE_KEY = `monitor_${monitorSlug}_sales_last_timestamp`;
-    const SALES_POLLING_INTERVAL = 4000;
+    const SALES_POLLING_MIN_INTERVAL = 4000;
+    const SALES_POLLING_MAX_INTERVAL = 60000;
+    const SALES_POLLING_BACKOFF_FACTOR = 1.5;
 
     // Configurações de sons
     const soundsConfig = @json(json_decode($configs['notifications_sounds_config'] ?? '{}', true) ?: []);
@@ -599,9 +620,11 @@
     @endforeach
     const notificationEventsConfig = @json($notificationEventsConfig ?? []);
 
-    let lastSaleTimestamp =
-        localStorage.getItem(SALES_STORAGE_KEY) ||
-        new Date(Date.now() - 5000).toISOString();
+    let sinceNotifications = null;
+    let salesPollingTimer = null;
+    let salesPollingDelay = SALES_POLLING_MIN_INTERVAL;
+    let salesPollingInFlight = false;
+    let lastSalesCountLog = null;
 
     const formatPoints = (points) => {
         const value = Number(points || 0);
@@ -612,7 +635,8 @@
     const saleTermLower = @json($saleTermLower);
 
     const toastQueue = [];
-    const MAX_VISIBLE_TOASTS = 2;
+    const MAX_VISIBLE_TOASTS = parseInt(@json($configs['notifications_popup_max_count'] ?? '2'), 10);
+    const AUTO_CLOSE_MS = parseInt(@json($configs['notifications_popup_auto_close_seconds'] ?? '7'), 10) * 1000;
 
     const getVisibleToasts = () => {
         if (!notificationsContainer) return [];
@@ -663,7 +687,7 @@
                 toast.remove();
                 showNextToast();
             }
-        }, 7000);
+        }, AUTO_CLOSE_MS);
 
         // Tenta preencher o segundo slot imediatamente
         showNextToast();
@@ -759,27 +783,76 @@
     const createSaleToast = (sale) => {
         if (!notificationsContainer) return;
 
+        console.log('Monitor: Renderizando notificação', {
+            id: sale?.id,
+            created_at: sale?.created_at,
+            seller: sale?.seller?.name
+        });
+
         // Adicionar à fila - o som será tocado quando a notificação aparecer na tela
         toastQueue.push(sale);
         showNextToast();
     };
 
-    const fetchRecentSales = async () => {
-        if (!notificationsEnabled) {
-            console.log('Monitor: Notificações desabilitadas', { notificationsEnabled });
+    const getNewestTimestamp = (sales) => {
+        return sales.reduce((latest, sale) => {
+            const ts = sale?.created_at;
+            if (!ts) return latest;
+            if (!latest || ts > latest) return ts;
+            return latest;
+        }, null);
+    };
+
+    const scheduleNextSalesPoll = (delayMs) => {
+        if (salesPollingTimer) {
+            clearTimeout(salesPollingTimer);
+        }
+        if (!notificationsEnabled || document.visibilityState !== 'visible') {
             return;
         }
+        salesPollingTimer = setTimeout(() => {
+            fetchRecentSales();
+        }, delayMs);
+    };
+
+    const updateSalesPollingDelay = (hasData) => {
+        if (hasData) {
+            salesPollingDelay = SALES_POLLING_MIN_INTERVAL;
+            return;
+        }
+        salesPollingDelay = Math.min(
+            SALES_POLLING_MAX_INTERVAL,
+            Math.round(salesPollingDelay * SALES_POLLING_BACKOFF_FACTOR)
+        );
+    };
+
+    const fetchRecentSales = async () => {
+        if (!notificationsEnabled) {
+            return;
+        }
+        if (document.visibilityState !== 'visible') {
+            return;
+        }
+        if (salesPollingInFlight) {
+            return;
+        }
+        salesPollingInFlight = true;
 
         const params = new URLSearchParams();
-        if (lastSaleTimestamp) {
-            params.append('since', lastSaleTimestamp);
+        if (sinceNotifications) {
+            params.append('since', sinceNotifications);
+        }
+        if (config.monitor_slug) {
+            params.append('monitor', config.monitor_slug);
+        }
+        if (config.sector_id) {
+            params.append('sector', config.sector_id);
         }
         params.append('limit', '20');
 
         try {
             const url = `/scores/recent?${params.toString()}`;
-            console.log('Monitor: Buscando vendas recentes', { url, lastSaleTimestamp });
-            
+            console.log('Monitor: Buscando vendas recentes', { url });
             const response = await fetch(url, {
                 headers: { 'Accept': 'application/json' },
             });
@@ -791,19 +864,32 @@
 
             const result = await response.json();
             const sales = result?.data || [];
+            console.log('Monitor: Payload de vendas recebido', { count: sales.length, payload: sales });
             
-            console.log('Monitor: Vendas recebidas', { count: sales.length, sales });
-
             if (sales.length > 0) {
                 sales.forEach(createSaleToast);
-                const newestTimestamp = sales[sales.length - 1]?.created_at;
-                if (newestTimestamp) {
-                    lastSaleTimestamp = newestTimestamp;
-                    localStorage.setItem(SALES_STORAGE_KEY, lastSaleTimestamp);
+                const newestTimestamp = getNewestTimestamp(sales);
+                if (newestTimestamp && newestTimestamp !== sinceNotifications) {
+                    sinceNotifications = newestTimestamp;
                 }
+                if (lastSalesCountLog !== sales.length) {
+                    console.log('Monitor: Novas vendas recebidas', { count: sales.length });
+                    lastSalesCountLog = sales.length;
+                }
+                updateSalesPollingDelay(true);
+            } else {
+                if (lastSalesCountLog !== 0) {
+                    console.log('Monitor: Nenhuma nova venda');
+                    lastSalesCountLog = 0;
+                }
+                updateSalesPollingDelay(false);
             }
         } catch (error) {
             console.error('Monitor: Erro ao buscar vendas recentes:', error);
+            updateSalesPollingDelay(false);
+        } finally {
+            salesPollingInFlight = false;
+            scheduleNextSalesPoll(salesPollingDelay);
         }
     };
 
@@ -1094,14 +1180,10 @@
         });
     }
 
-    // Leitura por voz automática (scheduler) + log de countdown
-    const voiceAutoState = {
-        lastVoiceTimestamp: localStorage.getItem(`monitor_${monitorSlug}_voice_last_timestamp`) || null,
-        lastTriggeredNextRunAt: null,
-        hasInitialized: false,
-        statusTimer: null,
-        pollingTimer: null,
-    };
+    // Leitura por voz automática baseada em intervalo
+    const voiceIntervalMinutes = @json((int) ($configs['notifications_voice_interval_minutes'] ?? 15));
+    const voiceOnlyWhenChanged = @json((($configs['notifications_voice_only_when_changed'] ?? 'false') === 'true'));
+    let lastVoiceHash = null;
 
     const getMonitorVoiceEnabled = () => {
         const rawVoiceEnabled = (window.DASHBOARD_CONFIG || {}).voice_enabled;
@@ -1118,128 +1200,100 @@
             ('speechSynthesis' in window);
     };
 
-    const fetchVoiceStatus = async () => {
+    const hashText = (text) => {
+        let hash = 0;
+        for (let i = 0; i < text.length; i += 1) {
+            hash = ((hash << 5) - hash) + text.charCodeAt(i);
+            hash |= 0;
+        }
+        return String(hash);
+    };
+
+    const shouldSpeakByContent = async () => {
+        if (!voiceOnlyWhenChanged) return true;
+        const scope = ['teams', 'both', 'global'].includes(voiceScope) ? voiceScope : 'global';
         try {
-            const response = await fetch(`/monitor/${monitorSlug}/voice/status`, {
-                headers: { 'Accept': 'application/json' },
-            });
-            if (!response.ok) return null;
-            return await response.json();
+            const url = new URL(`/monitor/${monitorSlug}/voice`, window.location.origin);
+            url.searchParams.set('scope', scope);
+            const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+            if (!response.ok) {
+                return false;
+            }
+            const result = await response.json();
+            const content = result?.content || '';
+            if (!content) return false;
+            const nextHash = hashText(content);
+            if (lastVoiceHash && lastVoiceHash === nextHash) {
+                return false;
+            }
+            lastVoiceHash = nextHash;
+            return true;
         } catch (error) {
-            console.warn('Monitor: Erro ao obter status da voz:', error);
-            return null;
+            console.warn('Monitor: Falha ao validar leitura por voz:', error);
+            return false;
         }
     };
 
-    const logVoiceCountdown = (status) => {
-        if (!status) return;
-        if (!status.enabled) {
-            console.log('Leitura por voz: desativada nas configurações.');
-            return;
-        }
-        const nextRunLabel = status.next_run_at
-            ? new Date(status.next_run_at).toLocaleString('pt-BR')
-            : 'indefinido';
-        if (!status.has_last_run) {
-            console.log(`Leitura por voz: aguardando primeira execução (próxima em ${nextRunLabel}).`);
-            return;
-        }
-        if ((status.overdue_seconds || 0) > 0) {
-            const overdueMinutes = Math.ceil(status.overdue_seconds / 60);
-            console.log(`Leitura por voz: atrasada ${overdueMinutes} min (próxima em ${nextRunLabel}).`);
-            return;
-        }
-        const remainingMinutes = Math.ceil((status.remaining_seconds || 0) / 60);
-        console.log(`Leitura por voz: faltam ${remainingMinutes} min (próxima em ${nextRunLabel}).`);
-    };
-
-    const checkVoicePendingAndStart = async () => {
+    const startVoiceAutoTimer = () => {
         if (!canUseBrowserVoice()) {
             return;
         }
-        if (document.visibilityState !== 'visible') {
-            return;
-        }
-        if (voiceSyncState.state !== 'idle' || window.isSpeaking) {
-            return;
-        }
-        const status = await fetchVoiceStatus();
-        if (!status || !status.enabled) {
-            return;
-        }
-        if (!voiceAutoState.hasInitialized) {
-            voiceAutoState.hasInitialized = true;
-            return;
-        }
-        if (!status.has_last_run) {
-            return;
-        }
-        const isDue = (status.remaining_seconds || 0) <= 0 || (status.overdue_seconds || 0) > 0;
-        if (!isDue) {
-            return;
-        }
-        if (voiceAutoState.lastTriggeredNextRunAt === status.next_run_at) {
-            return;
-        }
-        voiceAutoState.lastTriggeredNextRunAt = status.next_run_at || null;
-        await startVoiceSequence({ silent: true });
-    };
+        const intervalMs = Math.max(1, Number(voiceIntervalMinutes || 15)) * 60000;
+        let timerId = null;
+        let nextExecution = Date.now() + intervalMs;
+        let infoLogTimer = null;
 
-    const startVoiceStatusLogging = () => {
-        const tick = async () => {
-            const status = await fetchVoiceStatus();
-            logVoiceCountdown(status);
+        console.log('Monitor: Leitura por voz carregada', {
+            intervalo_minutos: Math.max(1, Number(voiceIntervalMinutes || 15)),
+            proxima_execucao: new Date(nextExecution).toLocaleTimeString('pt-BR')
+        });
+
+        const startInfoLog = () => {
+            if (infoLogTimer) clearInterval(infoLogTimer);
+            infoLogTimer = setInterval(() => {
+                console.log('Monitor: Leitura por voz agendada', {
+                    proxima_execucao: new Date(nextExecution).toLocaleTimeString('pt-BR'),
+                    minutos_restantes: Math.max(0, Math.ceil((nextExecution - Date.now()) / 60000))
+                });
+            }, 60000);
         };
-        tick();
-        if (voiceAutoState.statusTimer) clearInterval(voiceAutoState.statusTimer);
-        voiceAutoState.statusTimer = setInterval(tick, 60000);
-    };
 
-    const startVoiceAutoPolling = () => {
-        const tick = async () => {
-            await checkVoicePendingAndStart();
+        const scheduleNext = (delayMs) => {
+            if (timerId) clearTimeout(timerId);
+            timerId = setTimeout(async () => {
+                if (document.visibilityState === 'visible' && voiceSyncState.state === 'idle' && !window.isSpeaking) {
+                    const canSpeak = await shouldSpeakByContent();
+                    if (canSpeak) {
+                        await startVoiceSequence({ silent: true });
+                    }
+                }
+                    nextExecution = Date.now() + intervalMs;
+                    scheduleNext(intervalMs);
+            }, delayMs);
         };
-        tick();
-        if (voiceAutoState.pollingTimer) clearInterval(voiceAutoState.pollingTimer);
-        voiceAutoState.pollingTimer = setInterval(tick, 60000);
+
+            startInfoLog();
+            scheduleNext(intervalMs);
     };
 
-    startVoiceStatusLogging();
-    startVoiceAutoPolling();
+    startVoiceAutoTimer();
 
     // Controle de polling de notificações com detecção de visibilidade
-    let salesPollingInterval = null;
-    
     const startSalesPolling = () => {
-        if (salesPollingInterval) {
-            clearInterval(salesPollingInterval);
-        }
-        if (notificationsEnabled && document.visibilityState === 'visible') {
-            fetchRecentSales();
-            salesPollingInterval = setInterval(() => {
-                // Só buscar se a página estiver visível
-                if (document.visibilityState === 'visible') {
-                    fetchRecentSales();
-                }
-            }, SALES_POLLING_INTERVAL);
-        }
+        scheduleNextSalesPoll(0);
     };
     
     const stopSalesPolling = () => {
-        if (salesPollingInterval) {
-            clearInterval(salesPollingInterval);
-            salesPollingInterval = null;
+        if (salesPollingTimer) {
+            clearTimeout(salesPollingTimer);
+            salesPollingTimer = null;
         }
     };
     
     // Detectar mudanças de visibilidade da página
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            // Quando a página volta a ficar visível, atualizar o timestamp
-            // para evitar processar notificações antigas acumuladas
-            lastSaleTimestamp = new Date(Date.now() - 5000).toISOString();
-            localStorage.setItem(SALES_STORAGE_KEY, lastSaleTimestamp);
-            console.log('Monitor: Página voltou a ficar visível, timestamp atualizado para evitar acúmulo de notificações');
+            console.log('Monitor: Página visível, retomando polling de notificações');
             startSalesPolling();
         } else {
             // Quando a página perde o foco, pausar o polling

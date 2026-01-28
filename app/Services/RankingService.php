@@ -114,7 +114,7 @@ class RankingService
                 'seller_name' => $seller->name,
                 'seller_email' => $seller->email,
                 'seller_profile_photo_path' => $seller->profile_photo_path,
-                'team_name' => $seller->team?->name,
+                'team_name' => $seller->team?->display_label,
                 'season_name' => $seller->season?->name,
                 'points' => (float) $seller->points,
                 'position' => $position,
@@ -182,7 +182,7 @@ class RankingService
 
             return [
                 'team_id' => $team->id,
-                'team_name' => $team->name,
+                'team_name' => $team->display_label,
                 'total_points' => (float) $teamTotalPoints,
                 'sellers_count' => $sellers->count(),
                 'sellers' => $sellersData,

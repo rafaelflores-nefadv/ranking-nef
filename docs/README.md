@@ -53,7 +53,7 @@ Senha padrao: `password`
 ## Funcionalidades
 - Dashboard com ranking, top 3, estatisticas e filtro por equipe.
 - CRUD de vendedores (colaboradores).
-- CRUD de equipes.
+- CRUD de equipes (nome técnico + nome de exibição).
 - **Gerenciamento de usuarios** (apenas admin):
   - Criar, editar, desativar e excluir usuarios
   - Atribuir perfis (admin, supervisor)
@@ -87,7 +87,7 @@ Senha padrao: `password`
 - rotas de auth em `routes/auth.php` (login, register, etc.)
 
 ### API
-- `POST /api/webhook/occurrences` recebe ocorrencias externas
+- `POST /api/webhook/occurrences` recebe ocorrencias externas (**requer Bearer Token**)
 - `GET /scores/recent` vendas recentes para notificacoes (JSON)
 
 **Documentacao completa da API:** Veja [API.md](./API.md) para instrucoes detalhadas sobre como integrar sistemas de terceiros.
@@ -101,9 +101,11 @@ Payload:
   "email_funcionario": "vendedor@empresa.com",
   "ocorrencia": "venda",
   "credor": "Cliente X",
-  "equipe": "Equipe Alpha"
+  "equipe": "equipe_alpha"
 }
 ```
+
+> Nota: o campo `equipe` (quando enviado) deve ser o **nome técnico** da equipe (campo `teams.name`), pois é o identificador usado pelas integrações/API. O **Nome de Exibição** é apenas visual e não é usado pela API.
 
 Resposta:
 ```
@@ -117,6 +119,8 @@ Resposta:
 - `users`: nome, email, senha, role (admin/supervisor/user), is_active
 - `team_user`: tabela pivot para relacionar supervisores com equipes
 - `teams`: equipes
+  - `name`: nome técnico (obrigatório; único dentro do setor)
+  - `display_name`: nome de exibição (opcional; visual; não precisa ser único)
 - `seasons`: temporadas (ativa ou nao)
 - `sellers`: vendedores (team_id, season_id, pontos, status)
 - `score_rules`: regras de pontuacao por ocorrencia
