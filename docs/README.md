@@ -36,6 +36,14 @@ frontend em Blade (renderizacao no servidor). O frontend **nao** usa React.
 - `npm run dev`
 - `php artisan queue:listen --tries=1`
 
+### Produção (cron + fila)
+Em produção, para recursos assíncronos (ex.: processamento de ocorrências da API), você deve configurar:
+
+- **Scheduler**: cron chamando `php artisan schedule:run` a cada minuto
+- **Queue worker**: `php artisan queue:work ...` rodando 24/7 (systemd/supervisor)
+
+Guia completo: veja `docs/CRON_SETUP.md`.
+
 ## Usuarios de teste (seed)
 Senha padrao: `password`
 - `admin@nef.local` (admin) - Acesso completo ao sistema
@@ -182,7 +190,8 @@ Chaves em `configs` (seed inicial):
 ## Jobs e filas
 - `ProcessApiOccurrencesJob`: processa ocorrencias em lotes.
 - `SpeakRankingJob`: leitura por voz do ranking (TTS).
-- Rodar fila: `php artisan queue:listen --tries=1`
+- Rodar fila (desenvolvimento): `php artisan queue:listen --tries=1`
+- Rodar fila (produção): `php artisan queue:work --tries=3 --timeout=90` (recomendado via systemd/supervisor)
 
 ## Historico de leitura por voz
 O historico das leituras fica em `notification_histories` com:
@@ -266,5 +275,7 @@ docs/             # Documentação
 - "could not find driver": habilite o driver PDO do banco.
 - "Connection refused": verifique o servidor e credenciais do banco.
 - "Port already in use": `php artisan serve --port=8001`.
-- "Fila nao processa": inicie `queue:listen`.
+- "Fila nao processa" (ocorrências ficam com `processed = 0`):
+  - verifique se existe **worker** rodando (`queue:work`) e se o **cron do scheduler** está configurado
+  - veja `docs/CRON_SETUP.md`
 - Assets nao atualizam: rode `npm run dev`.

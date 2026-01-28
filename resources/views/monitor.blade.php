@@ -810,7 +810,8 @@
     if (readVoiceBtn) {
         // Configurações de voz do sistema (disponíveis no PHP)
         const browserVoiceName = @json(App\Models\Config::where('key', 'notifications_voice_browser_name')->value('value') ?? '');
-        const systemVoiceEnabled = @json((App\Models\Config::where('key', 'notifications_voice_enabled')->value('value') ?? 'false') === 'true');
+    const systemVoiceEnabled = @json((App\Models\Config::where('key', 'notifications_voice_enabled')->value('value') ?? 'false') === 'true');
+    const voiceScope = @json($configs['notifications_voice_scope'] ?? 'global');
         const voiceMode = @json(App\Models\Config::where('key', 'notifications_voice_mode')->value('value') ?? 'server');
         
         readVoiceBtn.addEventListener('click', async () => {
@@ -922,7 +923,7 @@
                     
                     try {
                         // Buscar leitura do ranking geral e todas as equipes (não apenas a selecionada)
-                        const voiceTextResponse = await fetch(`/monitor/${monitorSlug}/voice`, {
+                        const voiceTextResponse = await fetch(`/monitor/${monitorSlug}/voice?scope=both`, {
                             headers: { 'Accept': 'application/json' },
                         });
                         
@@ -968,6 +969,35 @@
                         );
                     }
                     return;
+                }
+
+                const shouldIncludeTeams = ['teams', 'both'].includes(voiceScope);
+                const hasTeamItems = items.some((item) => item?.scope === 'team');
+
+                if (shouldIncludeTeams && !hasTeamItems) {
+                    try {
+                        const voiceTextResponse = await fetch(`/monitor/${monitorSlug}/voice?scope=both`, {
+                            headers: { 'Accept': 'application/json' },
+                        });
+
+                        if (voiceTextResponse.ok) {
+                            const voiceTextResult = await voiceTextResponse.json();
+                            if (voiceTextResult?.content) {
+                                if (window.speechSynthesis.getVoices().length === 0) {
+                                    window.speechSynthesis.addEventListener('voiceschanged', async () => {
+                                        await speakText(voiceTextResult.content);
+                                        updateVoiceButtonState(false);
+                                    }, { once: true });
+                                } else {
+                                    await speakText(voiceTextResult.content);
+                                    updateVoiceButtonState(false);
+                                }
+                                return;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Monitor: Falha ao buscar leitura por voz completa:', error);
+                    }
                 }
 
                 // Garantir que as vozes estejam carregadas

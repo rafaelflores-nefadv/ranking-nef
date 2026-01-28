@@ -129,7 +129,10 @@ class MonitorController extends Controller
         $sectorId = $monitor->sector_id ?? app(SectorService::class)->getDefaultSectorId();
 
         $precision = (int)(\App\Models\Config::where('key', 'points_precision')->value('value') ?? 2);
-        $voiceScope = \App\Models\Config::where('key', 'notifications_voice_scope')->value('value') ?? 'global';
+        $requestedScope = $request->query('scope');
+        $voiceScope = in_array($requestedScope, ['global', 'teams', 'both'], true)
+            ? $requestedScope
+            : (\App\Models\Config::where('key', 'notifications_voice_scope')->value('value') ?? 'global');
         
         $allTexts = [];
 

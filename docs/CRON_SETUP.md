@@ -1,8 +1,11 @@
-# ⚙️ Configuração do Cronjob para Renovação Automática de Temporadas
+# ⚙️ Configuração de Scheduler (Cron) e Fila (Queue) em Produção
 
 ## 📋 O que é necessário?
 
-Para que a renovação automática de temporadas funcione, você precisa configurar um **cronjob** no servidor que execute o scheduler do Laravel.
+Para que rotinas automáticas funcionem (ex.: **processamento de ocorrências da API**, **renovação de temporadas**, **leitura por voz**, etc.), você precisa de:
+
+1. **Scheduler (Cron)** executando o `schedule:run` a cada minuto
+2. **Worker da fila (Queue)** rodando 24/7 (especialmente quando `QUEUE_CONNECTION=database`)
 
 ## 🔧 Configuração no Servidor
 
@@ -41,6 +44,61 @@ crontab -l
 # Testar manualmente
 cd /caminho/do/projeto && php artisan schedule:run
 ```
+
+---
+
+## 🧵 Worker da Fila (Queue) — obrigatório para processamento assíncrono
+
+O webhook da API e outras rotinas disparam jobs assíncronos. Se o `.env` estiver com `QUEUE_CONNECTION=database` (padrão do projeto), você precisa manter um worker rodando.
+
+### Rodar manualmente (teste rápido)
+
+```bash
+cd /caminho/do/projeto
+php artisan queue:work --tries=3 --timeout=90
+```
+
+### Rodar como serviço (Ubuntu/Debian com systemd) — recomendado
+
+1) Crie o arquivo do serviço:
+
+`/etc/systemd/system/ranking-nef-queue.service`
+
+```ini
+[Unit]
+Description=Ranking NEF Laravel Queue Worker
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/ranking-nef
+ExecStart=/usr/bin/php artisan queue:work --tries=3 --timeout=90
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+2) Ative e inicie:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now ranking-nef-queue
+sudo systemctl status ranking-nef-queue
+```
+
+### Diagnóstico rápido (quando “dados chegam mas não processam”)
+
+- **Verificar se há pendências** (ocorrências):
+  - `php artisan tinker --execute="echo \\App\\Models\\ApiOccurrence::where('processed',0)->count().PHP_EOL;"`
+- **Verificar jobs pendentes** (fila database):
+  - `php artisan tinker --execute="echo \\Illuminate\\Support\\Facades\\DB::table('jobs')->count().PHP_EOL;"`
+- **Verificar falhas**:
+  - `php artisan queue:failed`
+- **Ver logs do Laravel**:
+  - `tail -f storage/logs/laravel.log`
 
 ---
 

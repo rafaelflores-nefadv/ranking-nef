@@ -359,6 +359,20 @@ Quando há erros de validação, a resposta inclui detalhes dos campos inválido
 4. **Regras de Pontuação**: O sistema busca regras de pontuação ativas para o tipo de ocorrência
 5. **Atualização**: Os pontos são atribuídos ao vendedor e o ranking é atualizado
 
+### Requisitos para Processamento Automático (Produção)
+
+O processamento é feito por **jobs em fila**. Para que as ocorrências sejam processadas automaticamente, é necessário:
+
+- **Scheduler (cron)** executando `php artisan schedule:run` a cada minuto (responsável por disparar comandos agendados)
+- **Worker da fila** rodando 24/7 (ex.: `php artisan queue:work ...`), especialmente quando `QUEUE_CONNECTION=database`
+
+Se o seu sistema “recebe na API mas não processa” (ocorrências ficam com `processed = 0`), quase sempre é porque:
+
+- o cron do scheduler não está configurado, e/ou
+- o worker da fila não está em execução
+
+Veja o guia de produção em `docs/CRON_SETUP.md`.
+
 ### Tipos de Ocorrência
 
 O campo `ocorrencia` deve corresponder a uma regra de pontuação cadastrada no sistema. Exemplos comuns:
@@ -372,9 +386,16 @@ O campo `ocorrencia` deve corresponder a uma regra de pontuação cadastrada no 
 
 ### Vendedores
 
-Para que uma ocorrência seja processada e gere pontos, é necessário que exista um vendedor cadastrado no sistema com o email informado no campo `email_funcionario`.
+Para que uma ocorrência seja aceita e gere pontos, é necessário que exista um vendedor cadastrado **no mesmo setor do token**.
 
-Se o vendedor não existir, a ocorrência será armazenada mas não gerará pontos até que o vendedor seja cadastrado.
+Se o vendedor não existir (ou não pertencer ao setor), a API **retorna 422** com a mensagem:
+
+- `Vendedor não encontrado no setor`
+
+Da mesma forma, a API pode retornar 422 quando:
+
+- a equipe informada não existe no setor ou o vendedor não pertence a ela (`Equipe fora do setor`)
+- não existe regra ativa para a ocorrência no setor (`Regra inexistente no setor`)
 
 ---
 
