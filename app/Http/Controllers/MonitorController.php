@@ -411,6 +411,7 @@ class MonitorController extends Controller
                 'email' => $seller->email,
                 'profile_photo_path' => $seller->profile_photo_path,
                 'points' => $seller->points,
+                'status' => $seller->status,
                 'level' => $gamification['level'],
                 'badge' => $gamification['badge'],
                 'progress' => $gamification['progress'],

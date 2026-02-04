@@ -12,6 +12,17 @@
                     $avatarSrc = !empty($photoPath)
                         ? asset('storage/' . $photoPath)
                         : \App\Support\AvatarHelper::dataUri($entry['name'], 96);
+                    $status = $entry['status'] ?? null;
+                    $statusLabels = [
+                        'active' => 'Ativo',
+                        'inactive' => 'Inativo',
+                    ];
+                    $statusLabel = $status ? ($statusLabels[$status] ?? ucfirst($status)) : null;
+                    $statusClassMap = [
+                        'active' => 'border-emerald-500 text-emerald-200 bg-emerald-500/10',
+                        'inactive' => 'border-amber-500 text-amber-200 bg-amber-500/10',
+                    ];
+                    $statusClasses = $status ? ($statusClassMap[$status] ?? 'border-slate-500 text-slate-400 bg-slate-500/20') : '';
                 @endphp
                 <div class="relative bg-slate-900/60 backdrop-blur-sm rounded-xl p-3 border border-slate-700/50 hover:border-blue-500/50 transition-all group">
                     <div class="flex items-center gap-3">
@@ -32,6 +43,11 @@
                                 <span class="text-slate-400">Pontos: <span class="text-blue-400 font-semibold">{{ number_format($entry['points'], 0, ',', '.') }}</span></span>
                                 <span class="text-slate-500">•</span>
                                 <span class="text-slate-400">Passados: <span class="text-slate-300">0</span></span>
+                                @if($statusLabel)
+                                    <span class="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest rounded-full border {{ $statusClasses }}">
+                                        {{ $statusLabel }}
+                                    </span>
+                                @endif
                             </div>
                         </div>
                         <div class="flex-shrink-0">

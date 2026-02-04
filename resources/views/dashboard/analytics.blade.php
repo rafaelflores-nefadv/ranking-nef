@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard - Ranking NEF')
+@section('title', 'Dashboard - Game League')
 
 @section('content')
 <div class="min-h-screen bg-[#0a0e1a]">
@@ -8,7 +8,7 @@
     <div class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/50 px-8 py-6">
         <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-bold text-white mb-1">Análise de Receita e Margem</h1>
+            <h1 class="text-2xl font-bold text-white mb-1">Análise de pontuação e margem</h1>
             <p class="text-sm text-slate-400">Visão geral dos indicadores financeiros</p>
         </div>
         
@@ -48,10 +48,13 @@
                     </a>
                 @endif
             </form>
+            <a href="{{ route('reports.ranking-general') }}" target="_blank" rel="noopener" class="px-4 py-2 border border-slate-700/60 rounded-lg text-sm font-semibold text-slate-200 hover:bg-slate-800/60 hover:border-slate-500 transition-colors">
+                Abrir Relatório
+            </a>
             
             <!-- Branding -->
             <div class="px-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-lg">
-                <span class="text-white font-semibold text-sm">Ranking NEF</span>
+                <span class="text-white font-semibold text-sm">Game League</span>
             </div>
         </div>
     </div>
@@ -60,10 +63,10 @@
     <div class="p-8">
     <!-- Cards Superiores -->
     <div class="grid grid-cols-3 gap-6 mb-8">
-        <!-- Card Receita Operacional -->
+        <!-- Card Pontuação Operacional -->
         <div class="bg-gradient-to-br from-blue-600/20 to-blue-800/20 backdrop-blur-sm rounded-2xl border border-blue-500/30 p-6 shadow-xl">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-semibold text-blue-300 uppercase tracking-wide">Receita Operacional</h3>
+                <h3 class="text-sm font-semibold text-blue-300 uppercase tracking-wide">Pontuação Operacional</h3>
                 <div class="w-10 h-10 rounded-lg bg-blue-600/30 flex items-center justify-center">
                     <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -71,7 +74,7 @@
                 </div>
             </div>
             <div class="mb-4">
-                <p class="text-3xl font-bold text-white mb-1">R$ {{ number_format($total_receita, 0, ',', '.') }}</p>
+                <p class="text-3xl font-bold text-white mb-1">{{ number_format($total_receita, 0, ',', '.') }} pts</p>
                 <p class="text-xs text-blue-300/80">
                     @if($melhor_mes)
                         Melhor mês: <span class="font-semibold">{{ ucfirst($melhor_mes['mes_nome']) }} {{ $melhor_mes['ano'] }}</span>
@@ -88,7 +91,7 @@
         <!-- Card Margem de Contribuição -->
         <div class="bg-gradient-to-br from-green-600/20 to-green-800/20 backdrop-blur-sm rounded-2xl border border-green-500/30 p-6 shadow-xl">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-semibold text-green-300 uppercase tracking-wide">Margem de Contribuição</h3>
+                <h3 class="text-sm font-semibold text-green-300 uppercase tracking-wide">Margem de Pontuação</h3>
                 <div class="w-10 h-10 rounded-lg bg-green-600/30 flex items-center justify-center">
                     <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
@@ -96,7 +99,7 @@
                 </div>
             </div>
             <div class="mb-4">
-                <p class="text-3xl font-bold text-white mb-1">R$ {{ number_format($margem_contribuicao, 0, ',', '.') }}</p>
+                <p class="text-3xl font-bold text-white mb-1">{{ number_format($margem_contribuicao, 0, ',', '.') }} pts</p>
                 <p class="text-xs text-green-300/80">
                     @if($melhor_mes)
                         Melhor mês: <span class="font-semibold">{{ ucfirst($melhor_mes['mes_nome']) }} {{ $melhor_mes['ano'] }}</span>
@@ -138,15 +141,15 @@
 
     <!-- Área Inferior -->
     <div class="grid grid-cols-2 gap-6">
-        <!-- Tabela de Fornecedores -->
+        <!-- Tabela de Status -->
         <div class="bg-slate-900/60 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6 shadow-xl">
-            <h3 class="text-lg font-bold text-white mb-4">Fornecedores</h3>
+            <h3 class="text-lg font-bold text-white mb-4">Status</h3>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-slate-700/50">
-                            <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wide">Fornecedor</th>
-                            <th class="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wide">Receita</th>
+                            <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wide">Status</th>
+                            <th class="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wide">Pontuação</th>
                             <th class="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wide">MC</th>
                             <th class="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wide">% MC</th>
                         </tr>
@@ -155,8 +158,8 @@
                         @forelse($top_fornecedores as $fornecedor)
                             <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                                 <td class="py-3 px-4 text-white font-medium">{{ $fornecedor['fornecedor'] }}</td>
-                                <td class="py-3 px-4 text-right text-white">R$ {{ number_format($fornecedor['receita'], 0, ',', '.') }}</td>
-                                <td class="py-3 px-4 text-right text-green-400">R$ {{ number_format($fornecedor['margem'], 0, ',', '.') }}</td>
+                                <td class="py-3 px-4 text-right text-white">{{ number_format($fornecedor['receita'], 0, ',', '.') }} pts</td>
+                                <td class="py-3 px-4 text-right text-green-400">{{ number_format($fornecedor['margem'], 0, ',', '.') }} pts</td>
                                 <td class="py-3 px-4 text-right text-blue-400">{{ number_format($fornecedor['percentual_mc'], 1) }}%</td>
                             </tr>
                         @empty
@@ -173,7 +176,7 @@
 
         <!-- Gráfico de Barras Horizontais -->
         <div class="bg-slate-900/60 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6 shadow-xl">
-            <h3 class="text-lg font-bold text-white mb-4">Margem de Contribuição por Fornecedor</h3>
+            <h3 class="text-lg font-bold text-white mb-4">Margem de Pontuação por Status</h3>
             <div class="h-80">
                 <canvas id="chart-barras"></canvas>
             </div>
@@ -181,12 +184,15 @@
     </div>
 </div>
 
+@php
+    $dashboardDataJson = json_encode($dashboard_data ?? [], JSON_UNESCAPED_UNICODE);
+@endphp
 @push('scripts')
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 // Dados do backend - APENAS renderização, sem cálculos
-window.DASHBOARD_DATA = @json($dashboard_data ?? []);
+window.DASHBOARD_DATA = <?php echo $dashboardDataJson; ?>;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Extrair dados do objeto global (apenas para renderização)
@@ -234,13 +240,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // Gráfico Receita Operacional
+    // Gráfico Pontuação Operacional
     new Chart(document.getElementById('chart-receita'), {
         ...lineChartConfig,
         data: {
             labels: meses,
             datasets: [{
-                label: 'Receita',
+                label: 'Pontuação',
                 data: receitaData,
                 borderColor: 'rgb(96, 165, 250)',
                 backgroundColor: 'rgba(96, 165, 250, 0.1)',
@@ -255,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
         data: {
             labels: meses,
             datasets: [{
-                label: 'Margem',
+                label: 'Margem de Pontuação',
                 data: margemData,
                 borderColor: 'rgb(74, 222, 128)',
                 backgroundColor: 'rgba(74, 222, 128, 0.1)',
@@ -285,7 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
         data: {
             labels: fornecedores,
             datasets: [{
-                label: 'Margem de Contribuição',
+                label: 'Margem de Pontuação',
                 data: margemFornecedores,
                 backgroundColor: [
                     'rgba(59, 130, 246, 0.8)',
@@ -317,7 +323,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     enabled: true,
                     callbacks: {
                         label: function(context) {
-                            return 'MC: R$ ' + context.parsed.x.toLocaleString('pt-BR');
+                            return 'Margem de Pontuação: ' + context.parsed.x.toLocaleString('pt-BR') + ' pts';
                         }
                     }
                 }
@@ -328,7 +334,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     ticks: {
                         color: 'rgba(148, 163, 184, 0.8)',
                         callback: function(value) {
-                            return 'R$ ' + (value / 1000) + 'k';
+                            if (value >= 1000) {
+                                return (value / 1000).toFixed(1).replace('.', ',') + 'k pts';
+                            }
+                            return value.toLocaleString('pt-BR') + ' pts';
                         }
                     },
                     grid: {

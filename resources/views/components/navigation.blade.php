@@ -12,12 +12,10 @@
             <div class="flex">
                 <div class="flex-shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
-                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
-                            </svg>
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center overflow-hidden">
+                            <img src="https://i.postimg.cc/KYTJcmQn/image-removebg-preview.png" alt="Game League" class="w-full h-full object-cover">
                         </div>
-                        <span class="text-white font-bold">Ranking NEF</span>
+                        <span class="text-white font-bold">GAME LEAGUE</span>
                     </a>
                 </div>
 
@@ -56,7 +54,7 @@
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 14a4 4 0 1 0-8 0m12 6v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path>
                                 </svg>
-                                Vendedores
+                                Colaboradores
                             </span>
                         </a>
                     @endif
@@ -70,40 +68,6 @@
                             </span>
                         </a>
                     @endcan
-                    @if($user && in_array($user->role, ['admin', 'supervisor', 'user']))
-                        <details class="relative group inline-flex items-center">
-                            <summary class="list-none cursor-pointer inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('reports.*') ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-white hover:border-slate-300' }} text-sm font-medium">
-                                <span class="inline-flex items-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"></path>
-                                    </svg>
-                                    Relatórios
-                                    <svg class="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                </span>
-                            </summary>
-                            <div class="absolute left-0 top-full mt-2 w-56 rounded-xl bg-slate-900/95 border border-slate-700/60 shadow-xl backdrop-blur-sm py-2 z-50">
-                                <a href="{{ route('reports.ranking-general') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
-                                    Ranking Geral
-                                </a>
-                                <a href="{{ route('reports.ranking-team') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
-                                    Ranking por Equipe
-                                </a>
-                                <a href="{{ route('reports.score-evolution') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
-                                    Evolução de Pontuação
-                                </a>
-                                @if($user && in_array($user->role, ['admin', 'supervisor']))
-                                    <a href="{{ route('reports.occurrences') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
-                                        Ocorrências
-                                    </a>
-                                @endif
-                                <a href="{{ route('reports.gamification') }}" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
-                                    Gamificação
-                                </a>
-                            </div>
-                        </details>
-                    @endif
                 </div>
             </div>
 
@@ -186,6 +150,35 @@
                                 </svg>
                                 Monitores
                             </a>
+                        @endif
+                        @if($user && in_array($user->role, ['admin', 'supervisor', 'user']))
+                            <div class="border-t border-slate-800/60 mt-2 pt-2">
+                                <a href="{{ route('reports.ranking-general') }}" class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors rounded-lg">
+                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 14l5-5 5 5M5.5 20.5h13" />
+                                    </svg>
+                                    Relatórios
+                                </a>
+                                <div class="space-y-1">
+                                    <a href="{{ route('reports.ranking-general') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                        Ranking Geral
+                                    </a>
+                                    <a href="{{ route('reports.ranking-team') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                        Ranking por Equipe
+                                    </a>
+                                    <a href="{{ route('reports.score-evolution') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                        Evolução de Pontuação
+                                    </a>
+                                    @if($user && in_array($user->role, ['admin', 'supervisor']))
+                                        <a href="{{ route('reports.occurrences') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                            Ocorrências
+                                        </a>
+                                    @endif
+                                    <a href="{{ route('reports.gamification') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors">
+                                        Gamificação
+                                    </a>
+                                </div>
+                            </div>
                         @endif
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf

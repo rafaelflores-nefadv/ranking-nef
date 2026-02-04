@@ -790,6 +790,7 @@ class SettingsController extends Controller
                 'name' => $seller->name,
                 'email' => $seller->email,
                 'points' => $seller->points,
+                'status' => $seller->status,
                 'level' => $gamification['level'],
                 'badge' => $gamification['badge'],
                 'progress' => $gamification['progress'],
