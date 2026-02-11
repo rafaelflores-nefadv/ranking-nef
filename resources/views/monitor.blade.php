@@ -86,7 +86,7 @@
                         </svg>
                     </div>
                     <div>
-                        <h2 class="text-white font-bold">Ranking de {{ $saleTermLower }}<span id="ranking-team-name">{{ $activeTeam ? ' - ' . $activeTeam->display_label : '' }}</span></h2>
+                        <h2 class="text-white font-bold">Game de {{ $saleTermLower }}<span id="ranking-team-name">{{ $activeTeam ? ' - ' . $activeTeam->display_label : '' }}</span></h2>
                         <p class="text-slate-400 text-xs">Por pontuação</p>
                     </div>
                 </div>

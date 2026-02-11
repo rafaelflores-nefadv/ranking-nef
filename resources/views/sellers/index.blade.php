@@ -13,10 +13,10 @@
             </div>
             @can('create', App\Models\Seller::class)
             <div class="flex items-center gap-3">
-                <a href="{{ route('sellers.import') }}" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+                <a href="{{ route('sellers.import') }}" class="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                     Importar Vendedores
                 </a>
-                <a href="{{ route('sellers.create') }}" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
+                <a href="{{ route('sellers.create') }}" class="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                     Novo Vendedor
                 </a>
             </div>
@@ -36,10 +36,32 @@
         </div>
         @endif
 
+        <!-- Filtros -->
+        <div class="mb-6 bg-slate-900/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-4 grid gap-4 md:grid-cols-4">
+            <input id="seller-search" type="text" placeholder="Buscar vendedor" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select id="filter-team" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Todos os times</option>
+                @foreach($teams as $team)
+                    <option value="{{ $team->display_label ?? $team->name }}">{{ $team->display_label ?? $team->name }}</option>
+                @endforeach
+            </select>
+            <select id="filter-status" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Todos os status</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Inativo">Inativo</option>
+            </select>
+            <select id="filter-team-code" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Todos os setores</option>
+                @foreach($teams as $team)
+                    <option value="{{ $team->sector?->name ?? 'Sem setor' }}">{{ $team->sector?->name ?? 'Sem setor' }}</option>
+                @endforeach
+            </select>
+        </div>
+
         <!-- Tabela -->
         <div class="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="w-full">
+                <table id="sellers-table" class="w-full">
                     <thead class="bg-slate-800/50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Foto</th>
@@ -132,3 +154,43 @@
     </div>
 </div>
 @endsection
+
+@push('styles')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/datatables@1.10.25/media/css/jquery.dataTables.min.css">
+@endpush
+
+@push('scripts')
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/datatables@1.10.25/media/js/jquery.dataTables.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const table = $('#sellers-table').DataTable({
+            responsive: true,
+            columnDefs: [{ targets: -1, orderable: false }],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.10.25/i18n/Portuguese-Brasil.json'
+            },
+            dom: 'rtip',
+            pageLength: 10
+        });
+
+        $('#seller-search').on('keyup change', () => {
+            table.search($('#seller-search').val()).draw();
+        });
+
+        $('#filter-status').on('change', () => {
+            table.column(6).search($('#filter-status').val(), false, true).draw();
+        });
+
+        $('#filter-team').on('change', function () {
+            const val = this.value;
+            table.column(5).search(val, false, true).draw();
+        });
+
+        $('#filter-team-code').on('change', function () {
+            const val = this.value;
+            table.column(5).search(val, false, true).draw();
+        });
+    });
+</script>
+@endpush

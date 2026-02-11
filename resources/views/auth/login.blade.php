@@ -3,9 +3,9 @@
         <div class="w-full max-w-md">
             <div class="bg-slate-900 border border-slate-800 rounded-lg p-8 shadow-2xl">
                 <div class="flex flex-col items-center mb-8 gap-2">
-                    <img src="https://i.postimg.cc/KYTJcmQn/image-removebg-preview.png" alt="Logo Game League" class="w-20 h-20">
-                    <h1 class="text-2xl font-bold text-white game-league-title">Game League</h1>
-                    <p class="text-slate-400 text-sm">Acesse sua conta</p>
+                    <img src="https://i.postimg.cc/KYTJcmQn/image-removebg-preview.png" alt="Game League" class="w-30 h-30">
+                    <h1 class="text-2xl font-bold text-white game-league-title"></h1>
+                    <p class="text-slate-400 text-sm"></p>
                 </div>
 
                 <!-- Session Status -->
@@ -63,7 +63,7 @@
                         @endif
                     </div>
 
-                    <button type="submit" class="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 font-medium">
+                    <button type="submit" class="w-full px-4 py-2 rounded-lg font-medium text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af,rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                         Entrar
                     </button>
                 </form>
@@ -96,7 +96,7 @@
                 1px -1px 0 #020617,
                 -1px 1px 0 #020617,
                 1px 1px 0 #020617,
-                0 0 10px rgba(99, 102, 241, 0.9);
+                0 0 10px rgba(113, 99, 241, 0.81);
         }
     </style>
 @endpush

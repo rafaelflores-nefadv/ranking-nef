@@ -10,7 +10,7 @@
                 <h1 class="text-3xl font-bold text-white mb-2">Setores</h1>
                 <p class="text-slate-400">Gerencie os setores do sistema</p>
             </div>
-            <a href="{{ route('sectors.create') }}" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
+            <a href="{{ route('sectors.create') }}" class="px-4 py-2 rounded-lg text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                 Novo Setor
             </a>
         </div>

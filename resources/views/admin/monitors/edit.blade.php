@@ -158,10 +158,10 @@
 
                 <!-- Botões -->
                 <div class="flex items-center justify-end gap-4 mt-6 pt-6 border-t border-slate-700/50">
-                    <a href="{{ route('admin.monitors.index') }}" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+                    <a href="{{ route('admin.monitors.index') }}" class="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200" style='background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));'>
                         Cancelar
                     </a>
-                    <button type="submit" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors">
+                    <button type="submit" class="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200" style='background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));'>
                         Salvar Alterações
                     </button>
                 </div>
@@ -182,7 +182,9 @@
         if (!sectorsSelect || !teamsContainer) return;
 
         const sectorNameMap = new Map(
-            (@json($sectors->map(fn($s) => ['id' => $s->id, 'name' => $s->name])->values()->all()))
+            (@json($sectors->map(function ($s) {
+                return ['id' => $s->id, 'name' => $s->name];
+            })->values()->all()))
                 .map((s) => [s.id, s.name])
         );
 

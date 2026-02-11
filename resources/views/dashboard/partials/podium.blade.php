@@ -1,5 +1,5 @@
 @if(count($top3) > 0)
-    <div class="relative py-12">
+    <div class="relative py-12 podium-stage">
         <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[600px] h-32">
             <div class="relative w-full h-full">
                 <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-blue-500/30 to-purple-500/20 blur-xl"></div>
@@ -9,7 +9,7 @@
             </div>
         </div>
         
-        <div class="flex items-end justify-center gap-8 relative z-10">
+        <div class="flex items-end justify-center gap-16 w-full max-w-[1200px] mx-auto relative z-10">
             @if(isset($top3[1]))
                 @php
                     $seller2 = $top3[1];
@@ -18,8 +18,8 @@
                         ? asset('storage/' . $photoPath2)
                         : \App\Support\AvatarHelper::dataUri($seller2['name'], 128);
                 @endphp
-                <div class="relative z-20 podium-card podium-second">
-                    <div class="relative w-56 h-56 flex items-center justify-center">
+                <div class="relative z-20 podium-card podium-second" style="margin-bottom: 50px;">
+                    <div class="relative w-64 h-64 flex items-center justify-center">
                         <div class="absolute inset-0 bg-gradient-to-b from-cyan-400 via-cyan-500 to-cyan-600 opacity-20 blur-2xl shadow-cyan-500/50 shadow-2xl"></div>
                         <svg viewBox="0 0 200 240" class="w-full h-full">
                             <defs>
@@ -54,8 +54,8 @@
                         ? asset('storage/' . $photoPath1)
                         : \App\Support\AvatarHelper::dataUri($seller1['name'], 128);
                 @endphp
-                <div class="relative z-30 podium-card podium-first" style="transform: scale(1.2);">
-                    <div class="relative w-64 h-64 flex items-center justify-center">
+                <div class="relative z-30 podium-card podium-first" style="margin-bottom: 120px;">
+                    <div class="relative w-72 h-72 flex items-center justify-center">
                         <div class="absolute inset-0 bg-gradient-to-b from-yellow-400 via-amber-500 to-yellow-600 opacity-20 blur-2xl shadow-yellow-500/50 shadow-2xl"></div>
                         <svg viewBox="0 0 200 240" class="w-full h-full">
                             <defs>
@@ -96,8 +96,8 @@
                         ? asset('storage/' . $photoPath3)
                         : \App\Support\AvatarHelper::dataUri($seller3['name'], 128);
                 @endphp
-                <div class="relative z-20 podium-card podium-third">
-                    <div class="relative w-56 h-56 flex items-center justify-center">
+                <div class="relative z-10 podium-card podium-third" style="margin-bottom: 30px;">
+                    <div class="relative w-60 h-60 flex items-center justify-center">
                         <div class="absolute inset-0 bg-gradient-to-b from-orange-400 via-orange-500 to-red-500 opacity-20 blur-2xl shadow-orange-500/50 shadow-2xl"></div>
                         <svg viewBox="0 0 200 240" class="w-full h-full">
                             <defs>
@@ -139,3 +139,40 @@
         <p class="text-sm mt-2">Comece cadastrando participantes</p>
     </div>
 @endif
+
+@push('styles')
+<style>
+.podium-stage {
+    max-width: 1200px;
+    width: min(95vw, 1200px);
+    margin: 0 auto;
+}
+.podium-card h3,
+.podium-card p {
+    width: 200px;
+    text-align: center;
+    word-break: break-word;
+}
+.podium-card h3 {
+    max-width: 200px;
+}
+.podium-card {
+    transition: transform 260ms ease, filter 260ms ease;
+}
+.podium-first {
+    transform: scale(1.15);
+    filter: drop-shadow(0 18px 40px rgba(250, 204, 21, 0.55));
+}
+.podium-second {
+    transform: scale(1.05);
+    filter: drop-shadow(0 14px 32px rgba(59, 130, 246, 0.45));
+}
+.podium-third {
+    transform: scale(1);
+    filter: drop-shadow(0 12px 28px rgba(245, 158, 11, 0.4));
+}
+.podium-card:hover {
+    transform: translateY(-10px) scale(1.05);
+}
+</style>
+@endpush

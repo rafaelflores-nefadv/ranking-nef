@@ -23,7 +23,7 @@
             </div>
             <div class="flex gap-2">
                 <a href="{{ route('reports.ranking-general', array_merge(request()->query(), ['export' => 'csv'])) }}" 
-                   class="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700">
+                   class="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                     Exportar CSV
                 </a>
             </div>
@@ -78,7 +78,7 @@
                            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
                 <div class="md:col-span-5 flex gap-2">
-                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                    <button type="submit" class="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                         Filtrar
                     </button>
                     <a href="{{ route('reports.ranking-general') }}" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">

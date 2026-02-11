@@ -12,7 +12,7 @@
             <div class="flex">
                 <div class="flex-shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
-                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center overflow-hidden">
+                        <div class="w-20 h-20 rounded-lg flex items-center justify-center overflow-hidden">
                             <img src="https://i.postimg.cc/KYTJcmQn/image-removebg-preview.png" alt="Game League" class="w-full h-full object-cover">
                         </div>
                         <span class="text-white font-bold">GAME LEAGUE</span>

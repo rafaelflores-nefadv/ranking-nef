@@ -12,7 +12,7 @@
                 <p class="text-slate-400">Gerencie as metas de desempenho</p>
             </div>
             @can('create', App\Models\Goal::class)
-            <a href="{{ route('goals.create') }}" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
+            <a href="{{ route('goals.create') }}" class="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                 Nova Meta
             </a>
             @endcan
@@ -57,7 +57,7 @@
                     </select>
                 </div>
                 <div class="flex items-end">
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <button type="submit" class="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                         Filtrar
                     </button>
                     <a href="{{ route('goals.index') }}" class="ml-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">

@@ -48,13 +48,13 @@
                     </a>
                 @endif
             </form>
-            <a href="{{ route('reports.ranking-general') }}" target="_blank" rel="noopener" class="px-4 py-2 border border-slate-700/60 rounded-lg text-sm font-semibold text-slate-200 hover:bg-slate-800/60 hover:border-slate-500 transition-colors">
+            <a href="{{ route('reports.ranking-general') }}" target="_blank" rel="noopener" class="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                 Abrir Relatório
             </a>
             
             <!-- Branding -->
             <div class="px-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-lg">
-                <span class="text-white font-semibold text-sm">Game League</span>
+                <span class="text-white font-bungee-font text-sm">Game League</span>
             </div>
         </div>
     </div>
@@ -64,7 +64,7 @@
     <!-- Cards Superiores -->
     <div class="grid grid-cols-3 gap-6 mb-8">
         <!-- Card Pontuação Operacional -->
-        <div class="bg-gradient-to-br from-blue-600/20 to-blue-800/20 backdrop-blur-sm rounded-2xl border border-blue-500/30 p-6 shadow-xl">
+        <div class="backdrop-blur-sm rounded-2xl border border-slate-800/40 p-6 shadow-xl" style="background: linear-gradient(145deg, rgba(30,64,175,0.25), rgba(37,99,235,0.35), rgba(243,138,39,0.35));">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-semibold text-blue-300 uppercase tracking-wide">Pontuação Operacional</h3>
                 <div class="w-10 h-10 rounded-lg bg-blue-600/30 flex items-center justify-center">
@@ -89,7 +89,7 @@
         </div>
 
         <!-- Card Margem de Contribuição -->
-        <div class="bg-gradient-to-br from-green-600/20 to-green-800/20 backdrop-blur-sm rounded-2xl border border-green-500/30 p-6 shadow-xl">
+        <div class="backdrop-blur-sm rounded-2xl border border-slate-800/40 p-6 shadow-xl" style="background: linear-gradient(145deg, rgba(37,99,235,0.25), rgba(30,64,175,0.3), rgba(243,138,39,0.35));">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-semibold text-green-300 uppercase tracking-wide">Margem de Pontuação</h3>
                 <div class="w-10 h-10 rounded-lg bg-green-600/30 flex items-center justify-center">
@@ -114,7 +114,7 @@
         </div>
 
         <!-- Card % MC Geral -->
-        <div class="bg-gradient-to-br from-pink-600/20 to-pink-800/20 backdrop-blur-sm rounded-2xl border border-pink-500/30 p-6 shadow-xl">
+        <div class="backdrop-blur-sm rounded-2xl border border-slate-800/40 p-6 shadow-xl" style="background: linear-gradient(145deg, rgba(30,64,175,0.25), rgba(243,138,39,0.35), rgba(37,99,235,0.3));">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-semibold text-pink-300 uppercase tracking-wide">% MC Geral</h3>
                 <div class="w-10 h-10 rounded-lg bg-pink-600/30 flex items-center justify-center">
@@ -159,8 +159,13 @@
                             <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                                 <td class="py-3 px-4 text-white font-medium">{{ $fornecedor['fornecedor'] }}</td>
                                 <td class="py-3 px-4 text-right text-white">{{ number_format($fornecedor['receita'], 0, ',', '.') }} pts</td>
-                                <td class="py-3 px-4 text-right text-green-400">{{ number_format($fornecedor['margem'], 0, ',', '.') }} pts</td>
-                                <td class="py-3 px-4 text-right text-blue-400">{{ number_format($fornecedor['percentual_mc'], 1) }}%</td>
+                                <td class="py-3 px-4 text-right text-blue-300">{{ number_format($fornecedor['margem'], 0, ',', '.') }} pts</td>
+                                @php
+                                    $percentual = $fornecedor['receita'] > 0
+                                        ? ($fornecedor['margem'] / $fornecedor['receita']) * 100
+                                        : 0;
+                                @endphp
+                                <td class="py-3 px-4 text-right text-blue-400">{{ number_format($percentual, 1) }}%</td>
                             </tr>
                         @empty
                             <tr>
@@ -286,27 +291,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Gráfico de Barras Horizontais
-    new Chart(document.getElementById('chart-barras'), {
+    const chartBarrasEl = document.getElementById('chart-barras');
+    const chartBarrasCtx = chartBarrasEl.getContext('2d');
+    const barrasGradient = chartBarrasCtx.createLinearGradient(0, 0, chartBarrasEl.width, 0);
+    barrasGradient.addColorStop(0, 'rgba(30, 64, 175, 0.9)');
+    barrasGradient.addColorStop(0.4, 'rgba(37, 99, 235, 0.9)');
+    barrasGradient.addColorStop(1, 'rgba(243, 138, 39, 0.95)');
+
+    new Chart(chartBarrasEl, {
         type: 'bar',
         data: {
             labels: fornecedores,
             datasets: [{
                 label: 'Margem de Pontuação',
                 data: margemFornecedores,
-                backgroundColor: [
-                    'rgba(59, 130, 246, 0.8)',
-                    'rgba(59, 130, 246, 0.7)',
-                    'rgba(59, 130, 246, 0.6)',
-                    'rgba(59, 130, 246, 0.5)',
-                    'rgba(59, 130, 246, 0.4)'
-                ],
-                borderColor: [
-                    'rgb(59, 130, 246)',
-                    'rgb(59, 130, 246)',
-                    'rgb(59, 130, 246)',
-                    'rgb(59, 130, 246)',
-                    'rgb(59, 130, 246)'
-                ],
+                backgroundColor: barrasGradient,
+                borderColor: '#1e40af',
                 borderWidth: 1,
                 borderRadius: 8
             }]

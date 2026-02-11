@@ -5,7 +5,7 @@
     $saleTermLower = strtolower($saleTerm);
 @endphp
 
-@section('title', "Dashboard - Ranking de {$saleTermLower}")
+@section('title', "Dashboard - Game de {$saleTermLower}")
 
 @section('content')
 <div class="min-h-screen bg-[#0a0e1a] relative overflow-hidden">

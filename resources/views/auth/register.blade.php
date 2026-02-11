@@ -3,7 +3,7 @@
         <div class="w-full max-w-md">
             <div class="bg-slate-900 border border-slate-800 rounded-lg p-8 shadow-2xl space-y-6">
                 <div class="flex flex-col items-center gap-2">
-                    <img src="https://i.postimg.cc/KYTJcmQn/image-removebg-preview.png" alt="Game League" class="w-16 h-16">
+                    <x-application-logo class="w-24 h-24" />
                     <h1 class="text-2xl font-bold text-white">Crie sua conta</h1>
                     <p class="text-slate-400 text-sm">Acesse o painel Ranking NEF</p>
                 </div>
@@ -47,7 +47,7 @@
                         <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password" placeholder="••••••••" class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                     </div>
 
-                    <button type="submit" class="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button type="submit" class="w-full px-4 py-3 rounded-lg font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                         Registrar
                     </button>
                 </form>

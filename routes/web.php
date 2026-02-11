@@ -39,6 +39,11 @@ Route::get('/scores/recent', [ScoreController::class, 'recent'])->name('scores.r
 Route::get('/notifications/voice/recent', [NotificationController::class, 'voiceRecent'])
     ->name('notifications.voice.recent');
 
+// Landing Page para demonstração (acesso público)
+Route::get('/landing', function () {
+    return view('landing');
+})->name('landing');
+
 // Rotas protegidas
 Route::middleware('auth')->group(function () {
     // Dashboard

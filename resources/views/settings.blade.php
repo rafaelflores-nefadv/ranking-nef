@@ -662,7 +662,7 @@
                         <h2 class="text-xl font-bold text-white mb-2">Usuários do Sistema</h2>
                         <p class="text-slate-400 text-sm mb-4">Gerencie os usuários que podem acessar o sistema (Administradores e Supervisores).</p>
                         <div class="mb-4">
-                            <a href="{{ route('users.index') }}" class="inline-block px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700">
+                            <a href="{{ route('users.index') }}" class="inline-block px-4 py-2 rounded-lg font-medium text-white transition-all duration-200" style="background: linear-gradient(90deg, #1e40af, #2563eb, rgb(243, 138, 39), rgba(243, 119, 53, 0.95));">
                                 Gerenciar Usuários
                             </a>
                         </div>
